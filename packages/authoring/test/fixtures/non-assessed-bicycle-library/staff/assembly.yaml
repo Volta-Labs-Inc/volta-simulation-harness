@@ -1,0 +1,64 @@
+assembly_version: 1
+assembly_id: public-bicycle-library-assembly
+entrypoint: case.yaml
+pointer_syntax: RFC6901
+documents:
+  - { id: case, path: case.yaml, format: yaml, visibility: protected }
+  - { id: requirements, path: student/requirements.yaml, format: yaml, visibility: student }
+  - { id: personas, path: staff/personas.yaml, format: yaml, visibility: protected }
+  - { id: truth, path: staff/truth.yaml, format: yaml, visibility: protected }
+  - { id: evidence, path: staff/evidence.yaml, format: yaml, visibility: protected }
+  - { id: collections, path: staff/collections.yaml, format: yaml, visibility: protected }
+  - { id: economics, path: staff/economics.yaml, format: yaml, visibility: protected }
+  - { id: anchors, path: staff/anchors.yaml, format: yaml, visibility: protected }
+  - { id: boundaries, path: staff/boundaries.yaml, format: yaml, visibility: protected }
+  - { id: source_pins, path: staff/source-pins.yaml, format: yaml, visibility: protected }
+  - { id: route_validation, path: staff/route-validation.yaml, format: yaml, visibility: protected }
+  - { id: validation_record, path: staff/validation-record.yaml, format: yaml, visibility: protected }
+  - { id: calibration_effective, path: calibrations/effective.yaml, format: yaml, visibility: protected }
+  - { id: calibration_partial, path: calibrations/partial.yaml, format: yaml, visibility: protected }
+  - { id: calibration_not_yet, path: calibrations/not-yet.yaml, format: yaml, visibility: protected }
+  - { id: sanitized_reference, path: sanitized/reference.yaml, format: yaml, visibility: protected }
+  - { id: sanitized_expected, path: sanitized/expected.yaml, format: yaml, visibility: protected }
+normalized_mapping:
+  - { target_pointer: /case, source_document: case, source_pointer: /, operation: copy }
+  - { target_pointer: /requirements, source_document: requirements, source_pointer: /, operation: copy }
+  - { target_pointer: /personas, source_document: personas, source_pointer: /personas, operation: copy }
+  - { target_pointer: /persona_route_resolution, source_document: personas, source_pointer: /route_resolution, operation: copy }
+  - { target_pointer: /truth, source_document: truth, source_pointer: /, operation: copy }
+  - { target_pointer: /evidence, source_document: evidence, source_pointer: /entries, operation: copy }
+  - { target_pointer: /fact_index, source_document: evidence, source_pointer: /fact_index, operation: copy }
+  - { target_pointer: /collection_routes, source_document: collections, source_pointer: /rules, operation: copy }
+  - { target_pointer: /collection_route_resolution, source_document: collections, source_pointer: /route_resolution, operation: copy }
+  - { target_pointer: /collection_fallback, source_document: collections, source_pointer: /fallback, operation: copy }
+  - { target_pointer: /economics, source_document: economics, source_pointer: /, operation: copy }
+  - { target_pointer: /evaluation_anchors, source_document: anchors, source_pointer: /, operation: copy }
+  - { target_pointer: /decision_boundaries, source_document: boundaries, source_pointer: /, operation: copy }
+  - { target_pointer: /source_pins, source_document: source_pins, source_pointer: /, operation: copy }
+  - { target_pointer: /route_validation, source_document: route_validation, source_pointer: /, operation: copy }
+  - { target_pointer: /validation_record, source_document: validation_record, source_pointer: /, operation: copy }
+  - { target_pointer: /calibrations/effective, source_document: calibration_effective, source_pointer: /, operation: copy }
+  - { target_pointer: /calibrations/partially_effective, source_document: calibration_partial, source_pointer: /, operation: copy }
+  - { target_pointer: /calibrations/not_yet_effective, source_document: calibration_not_yet, source_pointer: /, operation: copy }
+  - { target_pointer: /reference_import/input, source_document: sanitized_reference, source_pointer: /, operation: copy }
+  - { target_pointer: /reference_import/expected, source_document: sanitized_expected, source_pointer: /, operation: copy }
+student_bundle:
+  always_copy:
+    - { source: student/README.md, target: README.md }
+    - { source: student/method.md, target: method.md }
+    - { source: student/requirements.yaml, target: requirements.yaml }
+    - { source: student/weekly-counts.csv, target: evidence/weekly-counts.csv }
+  released_evidence:
+    catalog_document: evidence
+    id_pointer: /entries/*/id
+    path_pointer: /entries/*/path
+    eligibility: Copy only after an official release event.
+    target_pattern: evidence/{evidence_id}/{basename}
+  forbidden_roots: [staff, private, calibrations, sanitized]
+asset_validation:
+  base_directory: .
+  require_relative_paths: true
+  reject_parent_traversal: true
+  reject_symlinks: true
+  require_catalog_entry_for_released_fixture: true
+  material_change_requires_new_case_version: true

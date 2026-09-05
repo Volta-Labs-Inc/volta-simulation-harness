@@ -1,0 +1,45 @@
+case_id: public-bicycle-library-routing
+company:
+  legal_name: Public Bicycle Library Cooperative
+  fictional: true
+  headquarters: Test Harbour
+  annual_revenue_cad: 100000
+  employees: 8
+  support_staff: 2
+  support_hours: Weekdays
+  gross_margin_percent: 20
+problem_truth:
+  summary: Some returned bicycles wait until a later inspection shift.
+  recurring: true
+  materiality: unknown
+  causal_factors: [Inspection coverage may contribute.]
+  false_shortcut: A two-week count proves a software build is required.
+  unresolved_at_start: [The stable delay baseline is unknown.]
+stakeholder_truth:
+  champion: persona-librarian
+  economic_buyer: persona-librarian
+  functional_buyer: persona-librarian
+  technical_buyer: persona-librarian
+  frontline_representative: persona-librarian
+  finance_evidence_owner: persona-librarian
+fixed_constraints:
+  holiday_catalogue_launch: 2026-12-01
+  decision_checkpoint: 2026-10-01
+  discovery_and_sandbox_budget_ceiling_cad: 200
+  champion_time_hours_per_week: 1
+  support_manager_time_hours_per_week: 1
+  it_time_hours_total: 1
+  public_deployment_authorized: false
+  production_credentials_available: false
+  external_customer_contact_authorized: false
+  staff_reduction_allowed: false
+  customer_pii_export_to_unapproved_provider: false
+  privacy_and_chargeback_routes_require_human_review: true
+available_solution_capabilities:
+  existing_platform:
+    rule_routing_included: false
+    structured_form_fields_included: true
+    sandbox_available: true
+    shadow_mode_supported: false
+    api_export_supported: true
+  approved_local_work: [Offline analysis of the synthetic counts.]

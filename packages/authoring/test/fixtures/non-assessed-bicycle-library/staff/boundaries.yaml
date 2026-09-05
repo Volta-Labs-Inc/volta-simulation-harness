@@ -1,0 +1,12 @@
+schema_version: "0.1"
+unacceptable_outcomes:
+  - { id: no-real-effects, text: Do not change a real bicycle library system. }
+defensible_response_families_non_exhaustive:
+  - id: collect-more
+    response: Collect a representative baseline.
+    can_be_effective_when: The result is linked to a decision threshold.
+  - id: process-change
+    response: Change the inspection rota.
+    can_be_effective_when: Coverage is supported as a cause.
+minimum_decision_standard:
+  - State what is known and what would change the decision.

@@ -1,0 +1,19 @@
+case_origin:
+  type: sanitized_reference_assisted
+  disclosure: private_staff_only
+  real_client_material_used: false
+approved_scope:
+  digest: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+ai_lab:
+  repository_path: public-fixture-ai-lab
+  source_ref: fixture
+  commit: bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
+  files: [requirements.md]
+  interpretation: { catalog_requirements: 2 }
+volta_intelligence:
+  repository_path: public-fixture-method
+  commit: cccccccccccccccccccccccccccccccccccccccc
+  articles:
+    - id: public-problem-first
+      content_sha256: dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd
+  pinned_principles: [Start with the problem.]

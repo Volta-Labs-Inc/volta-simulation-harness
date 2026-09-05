@@ -1,0 +1,5 @@
+calibration_id: public-effective
+rating: effective
+not_an_answer_key: true
+recommendation: { decision: collect_more_evidence }
+evaluator_rationale: This public example links missing evidence to a falsifiable decision.

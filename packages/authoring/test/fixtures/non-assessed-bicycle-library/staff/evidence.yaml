@@ -1,0 +1,59 @@
+schema_version: "0.1"
+authoritative_rule: Only released listed facts are official.
+entries:
+  - id: evidence-weekly-counts
+    title: Weekly counts
+    availability: initial
+    path: student/weekly-counts.csv
+    provenance: Synthetic weekly counts.
+    outcome_class: partial
+    releases: [fact-library-003]
+    limitations: [Two weeks do not establish a stable baseline.]
+  - id: evidence-guide
+    title: Inspection guide
+    availability: on_purposeful_request
+    request_intents: [inspection guide]
+    path: evidence/guide.md
+    provenance: Fictional operating guide.
+    outcome_class: complete
+    releases: [fact-library-004]
+  - id: evidence-sample-a
+    title: Representative sample
+    availability: after_collection
+    collection_route: collection-representative
+    path: evidence/sample-a.csv
+    provenance: Synthetic representative sample.
+    outcome_class: complete
+    releases: [fact-library-005]
+  - id: evidence-sample-b
+    title: Label review
+    availability: after_collection
+    collection_route: collection-representative
+    path: evidence/sample-b.csv
+    provenance: Synthetic second review.
+    outcome_class: complete
+    releases: [fact-library-006]
+  - id: evidence-quick-check
+    title: Quick check
+    availability: after_collection
+    collection_route: collection-quick
+    path: evidence/quick.csv
+    provenance: Synthetic quick check.
+    outcome_class: partial
+    releases: [fact-library-007]
+    limitations: [The check is not representative.]
+  - id: evidence-private-records
+    title: Member private records
+    availability: unavailable
+    outcome_class: unavailable
+    reason: Private member records are outside the simulation.
+    path: null
+    releases: []
+fact_index:
+  fact-library-001: Some returns wait until the next inspection shift.
+  fact-library-002: The sandbox budget is CAD 200.
+  fact-library-003: Five of 22 returns were inspected after the intended shift.
+  fact-library-004: The guide assigns inspection by bicycle type.
+  fact-library-005: The representative sample contains 40 returns.
+  fact-library-006: A second reviewer disagreed on four bicycle-type labels.
+  fact-library-007: The quick check contains five convenient returns.

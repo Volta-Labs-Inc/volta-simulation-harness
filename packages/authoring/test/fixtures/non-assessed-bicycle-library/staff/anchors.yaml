@@ -1,0 +1,8 @@
+schema_version: "0.1"
+visibility: staff_only
+judgment_scale: [effective, partially_effective, not_yet_effective]
+overall_rule: All four competencies are required.
+competencies: { public_example: true }
+case_specific_traps: [Treating a two-week count as a causal baseline.]
+defensible_outcomes: [Collect more evidence, change the inspection rota, or stop.]
+calibration_note: These public anchors are not an answer key.

@@ -1,0 +1,21 @@
+{
+  "name": "@volta-sim/authoring",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "bin": {
+    "volta-case-author": "./dist/cli.js"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "dependencies": {
+    "@volta-sim/contracts": "0.1.0",
+    "yaml": "2.9.0"
+  }
+}

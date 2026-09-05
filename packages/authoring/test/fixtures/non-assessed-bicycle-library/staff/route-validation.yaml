@@ -1,0 +1,25 @@
+schema_version: "0.1"
+resolution_contract: { tie: reject }
+test_cases:
+  - id: persona-one
+    route_type: persona
+    persona_id: persona-librarian
+    canonical_intent_ids: [delay]
+    expected: { status: matched, route_id: route-librarian-delay }
+  - id: persona-ambiguous
+    route_type: persona
+    persona_id: persona-librarian
+    canonical_intent_ids: [delay, budget]
+    expected: { status: ambiguous, route_id: null, fact_ids: [] }
+  - id: collection-multi-evidence
+    route_type: collection
+    canonical_intent_ids: [representative, sample]
+    expected:
+      status: matched
+      route_id: collection-representative
+      evidence_ids: [evidence-sample-a, evidence-sample-b]
+      advance_business_days: 2
+  - id: collection-excluded
+    route_type: collection
+    canonical_intent_ids: [representative, sample, private_records]
+    expected: { status: unavailable, route_id: collection-out-of-universe, evidence_ids: [], advance_business_days: 0 }

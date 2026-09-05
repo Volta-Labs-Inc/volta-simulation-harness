@@ -1,0 +1,39 @@
+{
+  "name": "volta-simulation-harness",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Public, reusable engine for evidence-led Volta student simulations.",
+  "license": "Apache-2.0",
+  "engines": {
+    "node": "22.23.2",
+    "npm": "10.9.9"
+  },
+  "packageManager": "npm@10.9.9",
+  "workspaces": [
+    "packages/*"
+  ],
+  "scripts": {
+    "build": "tsc -b packages/contracts packages/core packages/authoring packages/service-auth packages/truth-engine packages/provisioning packages/student-cli packages/staff-dashboard",
+    "case:validate": "npm run build --silent && node packages/authoring/dist/cli.js validate",
+    "clean": "tsc -b packages/contracts packages/core packages/authoring packages/service-auth packages/truth-engine packages/provisioning packages/student-cli packages/staff-dashboard --clean",
+    "lint": "eslint .",
+    "pilot:local": "npm run build --silent && node scripts/local-pilot.mjs",
+    "test": "vitest run",
+    "test:db": "supabase test db --local",
+    "db:reset": "supabase db reset --local",
+    "typecheck": "tsc -b packages/contracts packages/core packages/authoring packages/service-auth packages/truth-engine packages/provisioning packages/student-cli packages/staff-dashboard && tsc -p tsconfig.test.json --noEmit",
+    "verify": "npm run lint && npm run typecheck && npm test"
+  },
+  "dependencies": {
+    "yaml": "2.9.0",
+    "zod": "3.25.76"
+  },
+  "devDependencies": {
+    "@eslint/js": "9.39.5",
+    "@types/node": "22.19.15",
+    "eslint": "9.39.5",
+    "typescript": "5.9.3",
+    "typescript-eslint": "8.69.0",
+    "vitest": "4.1.11"
+  }
+}

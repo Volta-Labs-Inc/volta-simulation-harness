@@ -1,0 +1,10 @@
+schema_version: "0.1"
+currency: CAD
+fixed_inputs:
+  sandbox_ceiling_cad: { value: 200, fact_id: fact-library-002 }
+  weeks_per_year: 52
+measurable_after_collection:
+  representative_sample_size: { value: 40, evidence_id: evidence-sample-a }
+student_owned_inputs: [Response cost estimate]
+calculation_rules: [Do not double count value.]
+author_note: The example does not establish that a build is worthwhile.
