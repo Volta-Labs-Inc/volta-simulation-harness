@@ -1,0 +1,5 @@
+calibration_id: public-partial
+rating: partially_effective
+not_an_answer_key: true
+recommendation: { decision: continue }
+evaluator_rationale: This public example notices the gap but leaves the decision threshold vague.

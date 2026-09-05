@@ -1,0 +1,11 @@
+snapshot_id: public-requirements-1
+source_catalog_count: 2
+selection_rule: Include the two requirements needed for this public example.
+student_states:
+  allowed: [open, present, not_applicable]
+  not_applicable_requires_rationale: true
+  quality_judgment_visible_during_attempt: false
+requirements:
+  - { key: process-understood, label: Process understood, stage: problem, initial_state: open }
+  - { key: experiment-result, label: Experiment result, stage: outcome, optional: true, initial_state: open }
+excluded_as_not_case_applicable: []

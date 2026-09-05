@@ -1,0 +1,33 @@
+schema_version: "0.1"
+clock_start: 2026-09-01
+route_resolution: { tie: reject }
+rules:
+  - id: collection-representative
+    priority: 100
+    canonical_match:
+      all_of: []
+      any_groups: [[representative, sample]]
+      none_of: [private_records]
+    advance_business_days: 2
+    resource_cost: { librarian_hours: 1 }
+    releases: [evidence-sample-a, evidence-sample-b]
+    risk: { level: moderate, suggest_staff_review: true, blocks_sandbox_work: false }
+    student_result_note: The representative sample and label review are ready.
+    pre_action_coaching: none
+  - id: collection-quick
+    priority: 100
+    canonical_match:
+      all_of: [quick]
+      any_groups: []
+      none_of: []
+    advance_business_days: 1
+    resource_cost: { librarian_hours: 0.25 }
+    releases: [evidence-quick-check]
+    student_result_note: The quick check is ready with its collection method.
+    pre_action_coaching: none
+fallback:
+  id: collection-out-of-universe
+  availability: unavailable
+  advance_business_days: 0
+  releases: []
+  student_result_note: That collection is unavailable.

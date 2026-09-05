@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="light" />
+    <title>Fieldnote — Volta staff workbench</title>
+    <link rel="stylesheet" href="/web/styles.css" />
+  </head>
+  <body>
+    <header class="masthead">
+      <a class="wordmark" href="#assignments" aria-label="Fieldnote staff workbench home">
+        <span class="wordmark-mark" aria-hidden="true">V</span>
+        <span>FIELDNOTE</span>
+        <small>staff workbench</small>
+      </a>
+      <nav class="primary-nav" aria-label="Staff workbench">
+        <button type="button" data-route="cases">Cases</button>
+        <button type="button" data-route="assignments" aria-current="page">Assignments</button>
+      </nav>
+      <div class="environment-stamp">
+        <span class="live-dot" aria-hidden="true"></span>
+        <span id="environment-label">LOCAL FIXTURE</span>
+      </div>
+    </header>
+    <main id="app" tabindex="-1"></main>
+    <noscript>This local workbench needs JavaScript to render its synthetic fixture.</noscript>
+    <script type="importmap">{"imports":{"@volta-sim/core":"/core/dist/evaluation.js"}}</script>
+    <script type="module" src="/web/app.js"></script>
+  </body>
+</html>

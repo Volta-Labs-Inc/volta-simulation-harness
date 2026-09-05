@@ -1,0 +1,5 @@
+calibration_id: public-not-yet
+rating: not_yet_effective
+not_an_answer_key: true
+recommendation: { decision: continue }
+evaluator_rationale: This public example assumes a build from the two-week count.

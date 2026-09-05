@@ -1,0 +1,13 @@
+node_modules/
+.next/
+dist/
+coverage/
+.playwright-cli/
+output/
+.volta-sim/
+.env
+.env.*
+!.env.example
+.private/
+.DS_Store
+*.log

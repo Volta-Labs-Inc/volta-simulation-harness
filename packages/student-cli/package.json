@@ -1,0 +1,23 @@
+{
+  "name": "@volta-sim/student-cli",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "bin": {
+    "volta-sim": "./dist/bin.js",
+    "volta-sim-local": "./dist/local-bin.js"
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "dependencies": {
+    "@volta-sim/contracts": "0.1.0",
+    "@volta-sim/core": "0.1.0",
+    "zod": "3.25.76"
+  }
+}

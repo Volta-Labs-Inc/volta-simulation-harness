@@ -1,0 +1,25 @@
+schema_version: "0.1"
+grounding_rule: Release only the facts on the matched route.
+fallback_rule: Say the fact is unavailable and do not invent it.
+route_resolution: { tie: reject }
+personas:
+  - id: persona-librarian
+    display_name: Rowan
+    title: Bicycle librarian
+    roles: [champion]
+    incentives: [Reduce delays without losing bicycles.]
+    biases: [Remembers the most delayed returns.]
+    opening:
+      releases: [fact-library-001]
+      points: [Some returns wait until the next inspection shift.]
+    routes:
+      - id: route-librarian-delay
+        priority: 100
+        canonical_match: { any_of: [delay, wait_time], none_of: [private_records] }
+        releases: [fact-library-001]
+        response_points: [Some returns wait until the next inspection shift.]
+      - id: route-librarian-budget
+        priority: 100
+        canonical_match: { any_of: [budget], none_of: [] }
+        releases: [fact-library-002]
+        response_points: [The sandbox budget is CAD 200.]

@@ -1,0 +1,60 @@
+schema_version: "0.1"
+assembly_ref: staff/assembly.yaml
+route_validation_ref: staff/route-validation.yaml
+validation_record_ref: staff/validation-record.yaml
+case_id: public-bicycle-library-routing
+version: "fixture-draft-1"
+status: draft
+assessment_use: non-assessed-example
+title: Bicycle library return routing
+student_title: Bicycle library return routing
+experience_level: introductory
+difficulty:
+  level: introductory
+  deliberate_factors:
+    - A small data sample leaves the best response ambiguous.
+time_limit: null
+student_facing_budget_limit: null
+mode: text_only
+origin:
+  disclosure_to_student: simulated
+  private_metadata_ref: staff/source-pins.yaml
+methodology_snapshot:
+  student_ref: student/method.md
+  requirements_ref: student/requirements.yaml
+  private_source_ref: staff/source-pins.yaml
+competencies:
+  - { id: competency-problem-viability, label: Problem viability, required_for_overall_effective: true }
+  - { id: competency-evidence-sufficiency, label: Evidence sufficiency, required_for_overall_effective: true }
+  - { id: competency-proportionate-feasibility, label: Proportionate feasibility, required_for_overall_effective: true }
+  - { id: competency-objective-criteria, label: Objective criteria, required_for_overall_effective: true }
+visible_bundle:
+  brief: student/README.md
+  rubric: student/method.md
+  requirements: student/requirements.yaml
+  initial_evidence: [evidence-weekly-counts]
+personas_ref: staff/personas.yaml
+truth_ref: staff/truth.yaml
+evidence_catalog_ref: staff/evidence.yaml
+collection_consequences_ref: staff/collections.yaml
+economics_ref: staff/economics.yaml
+evaluation_anchors_ref: staff/anchors.yaml
+boundaries_ref: staff/boundaries.yaml
+calibrations:
+  - calibrations/effective.yaml
+  - calibrations/partial.yaml
+  - calibrations/not-yet.yaml
+reference_import_fixture: sanitized/reference.yaml
+assignment_defaults: { one_student_per_assignment: true }
+first_pilot: { enabled: false }
+out_of_universe:
+  result: unavailable
+  message: That information is outside this public fictional example.
+  releases_fact_ids: []
+publication:
+  generated_outputs_frozen: true
+  visible_bundle_sha256: pending-publication
+  protected_package_sha256: pending-publication
+  approval_required_after_material_change: true
+  approved_by: null
+  approved_at: null
