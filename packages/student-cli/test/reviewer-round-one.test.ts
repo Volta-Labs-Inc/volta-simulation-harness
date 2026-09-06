@@ -191,7 +191,7 @@ describe("adversarial completion repairs", () => {
           complete: false,
           missing: [{ path: "responsePlan.artifactSnapshots" }],
         },
-        artifactRequirement: { required: true, selected: false, minimumCount: 1 },
+        artifactRequirement: { required: true, satisfied: false, minimumCount: 1 },
       },
     });
     expect(buildPreparation).toMatchObject({
@@ -199,7 +199,7 @@ describe("adversarial completion repairs", () => {
       baseReady: true,
       ready: false,
       requestedMode: "build",
-      artifactRequirement: { required: true, selected: false, minimumCount: 1 },
+      artifactRequirement: { required: true, satisfied: false, minimumCount: 1 },
     });
 
     const noBuildValue = fixture();
@@ -217,7 +217,7 @@ describe("adversarial completion repairs", () => {
       baseReady: true,
       ready: true,
       requestedMode: "no-build",
-      artifactRequirement: { required: false, selected: true, minimumCount: 0 },
+      artifactRequirement: { required: false, satisfied: true, minimumCount: 0 },
     });
   });
 

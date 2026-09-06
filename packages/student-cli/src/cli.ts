@@ -507,9 +507,12 @@ function printResponse(
       response.view.attemptStatus === "submitted"
         ? submittedNextSteps(response.view.attemptNumber, commandName)
         : readinessNextSteps({
-      missing: response.view.readiness.missing,
-      requirements: response.view.readiness.requirements,
+            missing: response.view.readiness.missing,
+            requirements: response.view.readiness.requirements,
             artifactRequirement: response.view.artifactRequirement,
+            releasedFactCount: response.view.releasedEvidence.length,
+            personaIds: response.view.availablePersonas.map(({ id }) => id),
+            evidenceSourceIds: response.view.availableEvidence.map(({ id }) => id),
             commandName,
           });
     io.writeOut(JSON.stringify({ ...response, nextSteps }, null, 2));

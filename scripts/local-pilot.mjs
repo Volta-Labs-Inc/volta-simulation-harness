@@ -92,12 +92,18 @@ async function createAssignment(pilotRoot) {
   const guide = studentGuideMarkdown({
     commandName: studentCommand,
     launcherNote:
-      "This is a local, public, non-assessed pilot. Run every command from this folder while the launcher that created it is still running. The commands below are written out in full so they can be copied as-is.",
+      "This is a local, public, non-assessed pilot. Keep the terminal that printed this folder's path open: it runs the service behind every command. If a command fails to connect, that terminal has been closed and a new pilot must be started. The commands below are written out in full so they can be copied as-is.",
   });
   const agentInstructions = agentInstructionsMarkdown({ commandName: studentCommand });
-  const readme = `# ${visible.title}\n\n> New to simulations? Read [${START_HERE_FILE}](./${START_HERE_FILE}) first.\n\n${visible.brief}\n\n## Constraints\n\n${markdownList(visible.constraints)}\n\n## Unacceptable outcomes\n\n${markdownList(visible.unacceptableOutcomes)}\n\n## Possible response families\n\n${markdownList(visible.nonExhaustiveResponseFamilies)}\n`;
-  const method = `# Evaluation prompts\n\n${visible.competencies
-    .map(({ title, studentPrompt }) => `## ${title}\n\n${studentPrompt}`)
+  const people = visible.personas.map(
+    ({ id, name, role, studentBrief }) => `**${name}** (${role}), persona ID \`${id}\`: ${studentBrief}`,
+  );
+  const sources = visible.evidenceSources.map(
+    ({ id, title, studentBrief }) => `**${title}**, source ID \`${id}\`: ${studentBrief}`,
+  );
+  const readme = `# ${visible.title}\n\n> New to simulations? Read [${START_HERE_FILE}](./${START_HERE_FILE}) first.\n\n${visible.brief}\n\nThis scenario is simulated. Nothing here touches a real organisation, person, or system.\n\n## Constraints\n\n${markdownList(visible.constraints)}\n\n## Unacceptable outcomes\n\n${markdownList(visible.unacceptableOutcomes)}\n\n## Possible response families\n\n${markdownList(visible.nonExhaustiveResponseFamilies)}\n\n## Who and what you can ask\n\nEach only answers what was authored for this case. When every question to a source comes back with no answer, you have probably exhausted it; record what remains unknown.\n\n${markdownList(people)}\n${markdownList(sources)}\n`;
+  const method = `# Evaluation prompts\n\nEach heading is one competency. Defend it with the command shown, using the exact competency ID.\n\n${visible.competencies
+    .map(({ id, title, studentPrompt }) => `## ${title}\n\nCompetency ID: \`${id}\` (record with \`claim --competency ${id}\`)\n\n${studentPrompt}`)
     .join("\n\n")}\n`;
   await Promise.all([
     fs.promises.writeFile(path.join(assignmentRoot, "README.md"), readme, "utf8"),

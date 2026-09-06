@@ -63,7 +63,7 @@ describe("allowlisted HTTP student service client", () => {
             requirements: [],
             provenance: { citedOfficialFactCount: 0, unreleasedFactIds: [] },
           },
-          artifactRequirement: { required: false, selected: true, minimumCount: 0 },
+          artifactRequirement: { required: false, satisfied: true, minimumCount: 0 },
           availablePersonas: [],
           availableEvidence: [],
           availableCollectionMethods: [],
@@ -74,6 +74,7 @@ describe("allowlisted HTTP student service client", () => {
           releasedEvidence: [],
           recentEvents: [],
           stage: "discovery",
+          simulatedAt: "2026-09-04T12:00:00.000Z",
           pendingReview: false,
           reviewUpdates: [
             {
