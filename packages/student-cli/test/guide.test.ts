@@ -9,6 +9,7 @@ import {
   readinessNextSteps,
   studentGuideMarkdown,
 } from "../src/guide.js";
+import { localCommandName } from "../src/local-cli.js";
 import { FileBackedMockStudentService } from "../src/mock-service.js";
 import type { StudentServiceClient } from "../src/types.js";
 import { createStudentFixture } from "./fixture.js";
@@ -144,6 +145,16 @@ describe("student onboarding guide", () => {
   });
 });
 
+describe("local pilot command name", () => {
+  it("names the running script so a pasted command actually resolves", () => {
+    expect(localCommandName("/tmp/harness/packages/student-cli/dist/local-bin.js")).toBe(
+      "node '/tmp/harness/packages/student-cli/dist/local-bin.js' --manifest .volta-sim/local-pilot.json",
+    );
+    expect(localCommandName("/tmp/it's/local-bin.js")).toContain(`'/tmp/it'"'"'s/local-bin.js'`);
+    expect(localCommandName("")).toBe("volta-sim-local --manifest .volta-sim/local-pilot.json");
+  });
+});
+
 describe("first-contact CLI messages", () => {
   it("prints the guide without reading a session or contacting the service", async () => {
     const execute = vi.fn<StudentServiceClient["execute"]>();
@@ -235,7 +246,47 @@ describe("first-contact CLI messages", () => {
       expect(findStepFor(parsed.nextSteps, root), root).toBeDefined();
     }
   });
+
+  it("stops asking for a submission once the attempt is submitted", async () => {
+    const fixture = createStudentFixture();
+    roots.push(fixture.root, fixture.serviceRoot);
+    const submittedView = {
+      kind: "view" as const,
+      view: {
+        ...(await new FileBackedMockStudentService(fixture.serviceRoot, fixture.statePath).execute(
+          { kind: "status" },
+          (await loginToken(fixture)),
+        ).then((response) => (response.kind === "view" ? response.view : undefined)))!,
+        attemptStatus: "submitted" as const,
+        attemptNumber: 1,
+      },
+    };
+    const execute = vi.fn<StudentServiceClient["execute"]>(async (request) =>
+      request.kind === "status" ? submittedView : { kind: "checkpoint", prompts: [] },
+    );
+    const output = io();
+    await expect(
+      runCli(["status"], { assignmentRoot: fixture.root, client: { execute }, io: output.value }),
+    ).resolves.toBe(0);
+    const parsed = JSON.parse(output.stdout.join("\n")) as { nextSteps: readonly string[] };
+    expect(parsed.nextSteps.join("\n")).toContain("Attempt 1 is submitted and frozen");
+    expect(parsed.nextSteps.join("\n")).not.toContain("submit --operation-id");
+  });
 });
+
+async function loginToken(fixture: ReturnType<typeof createStudentFixture>): Promise<string> {
+  const service = new FileBackedMockStudentService(fixture.serviceRoot, fixture.statePath);
+  const login = io();
+  await runCli(["login", "--operation-id", "login-token"], {
+    assignmentRoot: fixture.root,
+    client: service,
+    io: login.value,
+  });
+  const session = JSON.parse(fs.readFileSync(`${fixture.root}/${fixture.sessionPath}`, "utf8")) as {
+    token: string;
+  };
+  return session.token;
+}
 
 const ROOT_TO_COMMAND: Readonly<Record<string, string>> = {
   ledger: "volta-sim ledger",

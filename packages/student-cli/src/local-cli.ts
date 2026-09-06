@@ -6,8 +6,19 @@ import { z } from "zod";
 import { runCli, type CliIo } from "./cli.js";
 import { HttpStudentServiceClient } from "./http-client.js";
 
-/** What a local-pilot student types before a command; the launcher prints the full node form. */
-export const LOCAL_COMMAND_NAME = "volta-sim-local --manifest .volta-sim/local-pilot.json";
+const LOCAL_MANIFEST_ARGUMENT = "--manifest .volta-sim/local-pilot.json";
+
+/**
+ * The exact text a local-pilot student can paste before a command. The pilot
+ * does not install a `volta-sim-local` shim, so guidance uses the running
+ * script's own path rather than a name that is not on PATH.
+ */
+export function localCommandName(scriptPath = process.argv[1]): string {
+  if (scriptPath === undefined || scriptPath === "") {
+    return `volta-sim-local ${LOCAL_MANIFEST_ARGUMENT}`;
+  }
+  return `node '${scriptPath.replaceAll("'", `'"'"'`)}' ${LOCAL_MANIFEST_ARGUMENT}`;
+}
 
 const DigestSchema = z.string().regex(/^sha256:[a-f0-9]{64}$/u);
 const LocalPilotManifestSchema = z
@@ -36,6 +47,7 @@ export type LocalPilotManifest = z.infer<typeof LocalPilotManifestSchema>;
 export interface RunLocalCliOptions {
   readonly cwd?: string;
   readonly io?: CliIo;
+  readonly commandName?: string;
 }
 
 function manifestContent(input: LocalPilotManifestInput) {
@@ -145,7 +157,7 @@ export async function runLocalCli(
     return runCli(argv.slice(2), {
       assignmentRoot: manifest.assignmentRoot,
       client: new HttpStudentServiceClient(manifest.serviceOrigin),
-      commandName: LOCAL_COMMAND_NAME,
+      commandName: options.commandName ?? localCommandName(),
       io,
     });
   } catch (error) {

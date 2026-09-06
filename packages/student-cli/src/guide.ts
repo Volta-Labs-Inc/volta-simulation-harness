@@ -153,6 +153,13 @@ export function readinessNextSteps(input: ReadinessGuidanceInput): string[] {
   return steps;
 }
 
+export function submittedNextSteps(attemptNumber: number, commandName = DEFAULT_COMMAND_NAME): string[] {
+  return [
+    `Attempt ${attemptNumber} is submitted and frozen. Nothing more is required from you.`,
+    `A human reviewer judges effectiveness; the tool does not grade. Run ${commandName} status later to see any staff response under reviewUpdates.`,
+  ];
+}
+
 export function loginNextSteps(commandName = DEFAULT_COMMAND_NAME): string[] {
   return [
     `Next: run ${commandName} status to see the brief, the people and sources you can ask, and what a complete submission needs.`,
