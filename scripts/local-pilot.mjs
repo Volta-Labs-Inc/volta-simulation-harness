@@ -10,6 +10,13 @@ import { sha256Digest } from "../packages/core/dist/canonical.js";
 import { createCaseVersionDigests } from "../packages/core/dist/case-version.js";
 import { publishCase } from "../packages/core/dist/published-case.js";
 import { nonAssessedLibraryRoutingCase } from "../packages/core/examples/non-assessed-library-routing.ts";
+import {
+  AGENT_INSTRUCTIONS_FILE,
+  CLAUDE_POINTER_FILE,
+  START_HERE_FILE,
+  agentInstructionsMarkdown,
+  studentGuideMarkdown,
+} from "../packages/student-cli/dist/guide.js";
 import { createLocalPilotManifest } from "../packages/student-cli/dist/local-cli.js";
 import { startLocalStudentHttpService } from "../packages/student-cli/dist/local-http-service.js";
 import { writeControlJson } from "../packages/student-cli/dist/control-files.js";
@@ -80,12 +87,22 @@ async function createAssignment(pilotRoot) {
   await fs.promises.mkdir(serviceRoot, { mode: 0o700 });
 
   const visible = nonAssessedLibraryRoutingCase.visible;
-  const readme = `# ${visible.title}\n\n${visible.brief}\n\n## Constraints\n\n${markdownList(visible.constraints)}\n\n## Unacceptable outcomes\n\n${markdownList(visible.unacceptableOutcomes)}\n\n## Possible response families\n\n${markdownList(visible.nonExhaustiveResponseFamilies)}\n`;
+  const localBin = path.join(repositoryRoot, "packages", "student-cli", "dist", "local-bin.js");
+  const studentCommand = `node ${shellQuote(localBin)} --manifest .volta-sim/local-pilot.json`;
+  const guide = studentGuideMarkdown({
+    commandName: studentCommand,
+    launcherNote:
+      "This is a local, public, non-assessed pilot. Run every command from this folder while the launcher that created it is still running. The commands below are written out in full so they can be copied as-is.",
+  });
+  const agentInstructions = agentInstructionsMarkdown({ commandName: studentCommand });
+  const readme = `# ${visible.title}\n\n> New to simulations? Read [${START_HERE_FILE}](./${START_HERE_FILE}) first.\n\n${visible.brief}\n\n## Constraints\n\n${markdownList(visible.constraints)}\n\n## Unacceptable outcomes\n\n${markdownList(visible.unacceptableOutcomes)}\n\n## Possible response families\n\n${markdownList(visible.nonExhaustiveResponseFamilies)}\n`;
   const method = `# Evaluation prompts\n\n${visible.competencies
     .map(({ title, studentPrompt }) => `## ${title}\n\n${studentPrompt}`)
     .join("\n\n")}\n`;
   await Promise.all([
     fs.promises.writeFile(path.join(assignmentRoot, "README.md"), readme, "utf8"),
+    fs.promises.writeFile(path.join(assignmentRoot, START_HERE_FILE), guide, "utf8"),
+    fs.promises.writeFile(path.join(assignmentRoot, AGENT_INSTRUCTIONS_FILE), agentInstructions, "utf8"),
     fs.promises.writeFile(path.join(assignmentRoot, "method.md"), method, "utf8"),
     fs.promises.writeFile(
       path.join(assignmentRoot, "requirements.json"),
@@ -94,16 +111,30 @@ async function createAssignment(pilotRoot) {
     ),
     fs.promises.writeFile(
       path.join(assignmentRoot, "results", "response.md"),
-      "# Student response\n\nRecord your own evidence-led response here.\n",
+      "# Working notes\n\nThis file is optional. Your reasoning is recorded through the student command, not here.\n\nUse this folder for your own working. If your response is a build or pilot, commit the file you want reviewed and select it with `submit --artifact results/<file>`. A no-build response submits no file.\n",
       "utf8",
     ),
     fs.promises.writeFile(path.join(assignmentRoot, ".gitignore"), ".volta-sim/\n", "utf8"),
   ]);
 
+  // Claude Code reads CLAUDE.md; a relative symlink keeps it identical to AGENTS.md
+  // for every other agent without a second copy that could drift.
+  await fs.promises.symlink(AGENT_INSTRUCTIONS_FILE, path.join(assignmentRoot, CLAUDE_POINTER_FILE));
+
   git(assignmentRoot, ["init", "--initial-branch=main"]);
   const repositorySlug = `Volta-Labs-Inc/${assignmentId}`;
   git(assignmentRoot, ["remote", "add", "origin", `https://github.com/${repositorySlug}.git`]);
-  git(assignmentRoot, ["add", ".gitignore", "README.md", "method.md", "requirements.json", "results/response.md"]);
+  git(assignmentRoot, [
+    "add",
+    ".gitignore",
+    "README.md",
+    START_HERE_FILE,
+    AGENT_INSTRUCTIONS_FILE,
+    CLAUDE_POINTER_FILE,
+    "method.md",
+    "requirements.json",
+    "results/response.md",
+  ]);
   git(assignmentRoot, [
     "-c",
     "user.name=Volta Local Pilot",
@@ -261,6 +292,8 @@ async function run() {
     const studentPrefix = `cd ${shellQuote(assignment.assignmentRoot)} && node ${shellQuote(localBin)} --manifest .volta-sim/local-pilot.json`;
     process.stdout.write("Local pilot ready\n");
     process.stdout.write(`Assignment checkout: ${assignment.assignmentRoot}\n`);
+    process.stdout.write(`Student guide: ${path.join(assignment.assignmentRoot, START_HERE_FILE)}\n`);
+    process.stdout.write(`Agent instructions: ${path.join(assignment.assignmentRoot, AGENT_INSTRUCTIONS_FILE)} (${CLAUDE_POINTER_FILE} links to it)\n`);
     process.stdout.write(`Student manifest: ${manifestPath}\n`);
     process.stdout.write(`Student service: ${studentService.origin}\n`);
     process.stdout.write(`Staff workbench: ${staffOrigin}\n`);

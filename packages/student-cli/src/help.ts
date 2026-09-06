@@ -1,4 +1,5 @@
 const COMMAND_SUMMARIES = [
+  ["guide", "Explain how a simulation works and what to do first."],
   ["login", "Pair this checkout with your assigned simulation."],
   ["resume", "Show the current assignment after signing in."],
   ["status", "Show released facts, captured work, and submission readiness."],
@@ -24,6 +25,12 @@ const COMMAND_SUMMARIES = [
 ] as const;
 
 const COMMAND_HELP: Readonly<Record<string, string>> = {
+  guide: `Usage: volta-sim guide
+
+Prints the harness guide: what a simulation is, the five allowed conclusions, what each file in the folder is for, the recording loop, operation IDs, and what "not available" means. The same text is in START-HERE.md. It reads no session and contacts no service.
+
+Example:
+  volta-sim guide`,
   login: `Usage: volta-sim login --operation-id <safe-id>
 
 --operation-id  1-160 letters, numbers, dots, colons, underscores, or hyphens.
@@ -185,6 +192,8 @@ export function globalHelp(): string {
     ([name, summary]) => `  ${name.padEnd(18)} ${summary}`,
   ).join("\n");
   return `Volta Simulation Harness student CLI
+
+New here? Run volta-sim guide (or read START-HERE.md), then volta-sim login --operation-id login-1, then volta-sim status.
 
 Usage:
   volta-sim <command> [options]

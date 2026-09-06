@@ -1,5 +1,5 @@
 /* global fetch */
-import { execFile, spawn } from "node:child_process";
+import { execFile, execFileSync, spawn } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -152,8 +152,33 @@ test(
 
     const assignmentFiles = fs.readdirSync(assignmentRoot);
     expect(assignmentFiles).toEqual(
-      expect.arrayContaining([".git", ".gitignore", ".volta-sim", "README.md", "method.md", "results"]),
+      expect.arrayContaining([
+        ".git",
+        ".gitignore",
+        ".volta-sim",
+        "README.md",
+        "START-HERE.md",
+        "method.md",
+        "results",
+      ]),
     );
+    expect(output.value).toContain(`Student guide: ${path.join(assignmentRoot, "START-HERE.md")}`);
+    const startHere = fs.readFileSync(path.join(assignmentRoot, "START-HERE.md"), "utf8");
+    expect(startHere).toContain("# Start here");
+    expect(startHere).toContain("--manifest .volta-sim/local-pilot.json login --operation-id login-1");
+    expect(fs.readFileSync(path.join(assignmentRoot, "README.md"), "utf8")).toContain("START-HERE.md");
+    const committedTree = execFileSync("git", ["-C", assignmentRoot, "ls-tree", "HEAD"], {
+      encoding: "utf8",
+    });
+    expect(committedTree).toMatch(/100644 blob [a-f0-9]+\tSTART-HERE\.md/u);
+    expect(committedTree).toMatch(/100644 blob [a-f0-9]+\tAGENTS\.md/u);
+    expect(committedTree).toMatch(/120000 blob [a-f0-9]+\tCLAUDE\.md/u);
+    expect(fs.lstatSync(path.join(assignmentRoot, "CLAUDE.md")).isSymbolicLink()).toBe(true);
+    expect(fs.readlinkSync(path.join(assignmentRoot, "CLAUDE.md"))).toBe("AGENTS.md");
+    const agentInstructions = fs.readFileSync(path.join(assignmentRoot, "CLAUDE.md"), "utf8");
+    expect(agentInstructions).toBe(fs.readFileSync(path.join(assignmentRoot, "AGENTS.md"), "utf8"));
+    expect(agentInstructions).toContain("# Agent instructions for this simulation");
+    expect(agentInstructions).toContain("--manifest .volta-sim/local-pilot.json status");
     expect(assignmentFiles).not.toEqual(
       expect.arrayContaining(["staff", "private", "calibrations", "sanitized"]),
     );
