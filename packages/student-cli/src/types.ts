@@ -23,7 +23,7 @@ export interface RequirementStatus {
 
 export interface ArtifactRequirement {
   readonly required: boolean;
-  readonly selected: boolean;
+  readonly satisfied: boolean;
   readonly minimumCount: 0 | 1;
 }
 
@@ -151,6 +151,8 @@ export interface StudentAssignmentView {
     readonly message: string;
   }[];
   readonly stage: string;
+  /** The case's own clock. Persona and evidence replies may advance it. */
+  readonly simulatedAt: string;
   readonly pendingReview: boolean;
   readonly reviewUpdates: readonly {
     readonly topic: string;
@@ -311,6 +313,15 @@ export type StudentServiceResponse =
       readonly event?: OfficialActionEvent;
       readonly checkpointPrompts: readonly string[];
       readonly reviewSuggested: boolean;
+      /** Present whenever reviewSuggested is true: why, and what the student can do about it. */
+      readonly reviewSuggestion?: { readonly reason: string; readonly nextStep: string };
+      /** Present when the action advanced the simulated clock. */
+      readonly simulatedTime?: {
+        readonly advancedBy: { readonly amount: number; readonly unit: "minutes" | "hours" | "days" };
+        readonly now: string;
+      };
+      /** Plain-language note on what the reply means for the student's next move. */
+      readonly guidance?: string;
       readonly sandboxWorkBlocked: false;
       readonly replayed: boolean;
       readonly recorded?:
@@ -321,7 +332,12 @@ export type StudentServiceResponse =
           }
         | { readonly kind: "criterion"; readonly criterionId: string }
         | { readonly kind: "criterion-removal"; readonly criterionId: string }
-        | { readonly kind: "calculation" | "calculation-removal"; readonly calculationId: string };
+        | { readonly kind: "calculation" | "calculation-removal"; readonly calculationId: string }
+        | { readonly kind: "estimate"; readonly estimateId: string }
+        | { readonly kind: "decision"; readonly decisionId: string }
+        | { readonly kind: "requirement"; readonly requirementId: string }
+        | { readonly kind: "claim"; readonly competencyId: string }
+        | { readonly kind: "draft"; readonly mode: string };
     }
   | { readonly kind: "checkpoint"; readonly prompts: readonly string[] }
   | {

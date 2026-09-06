@@ -95,10 +95,14 @@ const STEP_BY_PATH = new Map(DRAFT_STEPS.map((step) => [step.path, step]));
 
 export interface ReadinessGuidanceInput {
   readonly missing: readonly { readonly path: string; readonly message?: string }[];
+  /** Released official facts so far; when empty, discovery comes before any recording. */
+  readonly releasedFactCount?: number;
+  readonly personaIds?: readonly string[];
+  readonly evidenceSourceIds?: readonly string[];
   readonly requirements?: readonly { readonly requirementId: string; readonly status: string }[];
   readonly artifactRequirement?: {
     readonly required: boolean;
-    readonly selected: boolean;
+    readonly satisfied: boolean;
   };
   readonly commandName?: string;
 }
@@ -111,8 +115,17 @@ export interface ReadinessGuidanceInput {
 export function readinessNextSteps(input: ReadinessGuidanceInput): string[] {
   const command = input.commandName ?? DEFAULT_COMMAND_NAME;
   const steps: string[] = [];
+  if (input.releasedFactCount === 0 && input.missing.length > 0) {
+    const persona = input.personaIds?.[0] ?? "<persona-id>";
+    const source = input.evidenceSourceIds?.[0] ?? "<evidence-source-id>";
+    steps.push(
+      `Nothing has been released yet, so start with discovery: ${command} talk --operation-id <your-id> --persona ${persona} --question <one specific question>, or ${command} evidence --operation-id <your-id> --source ${source} --question <one specific question>. Each reply names any fact ID it released.`,
+    );
+  }
   const firstByRoot = new Map<string, string | undefined>();
   for (const { path, message } of input.missing) {
+    // The artifact rule has its own step below; it is not a reason to re-run draft.
+    if (path === "responsePlan.artifactSnapshots") continue;
     const rootPath = path.split(".")[0] ?? path;
     if (!firstByRoot.has(rootPath)) firstByRoot.set(rootPath, message);
   }
@@ -126,9 +139,12 @@ export function readinessNextSteps(input: ReadinessGuidanceInput): string[] {
   const missingRequirements = (input.requirements ?? []).filter(
     ({ status }) => status === "missing",
   );
+  const draftMissing = firstByRoot.has("responsePlan");
   for (const [rootPath, message] of ordered) {
     // The per-requirement lines below are more specific than the generic one.
     if (rootPath === "requirementAssessments" && missingRequirements.length > 0) continue;
+    // Both are fields of the one draft command; listing them separately reads as extra commands.
+    if (draftMissing && (rootPath === "missingDataPlan" || rootPath === "economicRationale")) continue;
     const step = STEP_BY_PATH.get(rootPath);
     if (step === undefined) {
       steps.push(`${rootPath}: ${message ?? "needs attention"}. Run ${command} status for details.`);
@@ -142,7 +158,7 @@ export function readinessNextSteps(input: ReadinessGuidanceInput): string[] {
       `Assess requirement ${requirement.requirementId}: ${command} requirement --operation-id <your-id> --id ${requirement.requirementId} --status <addressed|not-yet|not-applicable> --rationale <text>`,
     );
   }
-  if (input.artifactRequirement?.required === true && input.artifactRequirement.selected === false) {
+  if (input.artifactRequirement?.required === true && input.artifactRequirement.satisfied === false) {
     steps.push(
       `A build or pilot response needs a committed artifact: commit the file, then ${command} submit --operation-id <your-id> --artifact <tracked .md/.txt/.csv/.json path>`,
     );
@@ -201,7 +217,7 @@ Choosing not to build is a legitimate, complete answer when the evidence support
 | \`README.md\` | The case brief: the situation, constraints, unacceptable outcomes, and possible response families. |
 | \`method.md\` | The four competencies you will be judged on. Each one becomes a \`claim\` you must make. |
 | \`requirements.*\` | Case requirements you must assess (addressed, not yet, or not applicable). |
-| \`results/\` | Space for your own working files. A build or pilot response must commit at least one file here and select it when submitting. |
+| \`results/\` | Space for your own working files. It starts with an optional note you can overwrite or delete. A build or pilot response must commit at least one file here and select it when submitting. |
 | \`${START_HERE_FILE}\` | This guide. |
 | \`${AGENT_INSTRUCTIONS_FILE}\`, \`${CLAUDE_POINTER_FILE}\` | Standing instructions for a coding agent you use here. \`${CLAUDE_POINTER_FILE}\` is a link to \`${AGENT_INSTRUCTIONS_FILE}\`. |
 | \`.volta-sim/\` | Private session files. Already ignored by Git. **Never commit them.** |
@@ -211,12 +227,20 @@ Your reasoning is recorded through the command-line tool, not in these files. Th
 ## How the simulation works
 
 1. **Sign in** once to pair this folder with your assignment.
-2. **Discover.** Ask the available people (\`talk\`) and evidence sources (\`evidence\`) explicit questions. Schedule evidence collection (\`collect\`) when a method is offered. Advance simulated time (\`advance\`) when something has to wait.
-3. **Record your reasoning** as you go: facts, assumptions, contradictions, and unknowns (\`ledger\`); estimates (\`estimate\`); calculations (\`calculation\`); requirement assessments (\`requirement\`); success and failure criteria (\`criterion\`).
-4. **Decide and draft.** Record your decision (\`decision\`), your proposed response (\`draft\`), and defend each competency (\`claim\`).
+2. **Discover.** Ask the available people (\`talk\`) and evidence sources (\`evidence\`) one specific question at a time. Each answers only what was authored for this case, so when every question to a source comes back with no answer you have probably exhausted it. Some cases also offer evidence collection (\`collect\`) and let you move simulated time forward (\`advance\`); \`status\` shows \`availableCollectionMethods\`, which may be empty.
+3. **Record your reasoning** as you go: facts, assumptions, contradictions, and unknowns (\`ledger\`); estimates (\`estimate\`); calculations (\`calculation\`); requirement assessments (\`requirement\`); success and failure criteria (\`criterion\`). Only a fact entry produces an evidence ID you can cite later. The other kinds are still part of your submission and are shown to reviewers; refer to them in your rationale text.
+4. **Decide and draft.** Record your decision (\`decision\`), your proposed response with its missing-data plan and economic rationale (\`draft\`), and defend each competency (\`claim\`). Recording any of these again replaces the earlier version in your working draft.
 5. **Submit.** \`status\` shows exactly what is still missing. \`submit\` checks completeness, never quality, and freezes your work.
 
 A human reviewer judges effectiveness afterwards. The tool will not tell you whether you are right.
+
+Two commands change nothing and are safe at any time: \`resume\` prints the same full view as \`status\` and exists so that "pick up where I left off" has an obvious name, and \`checkpoint\` prints the same reflection prompts the tool shows after a meaningful event.
+
+Some commands take structured values separated by \`|\`, for example the expected-evidence and pivot-condition parts of \`decision\` and the inputs of \`calculation\`. Run \`${command} help decision\` or \`${command} help calculation\` before your first use; each shows the exact format and a complete example.
+
+## Simulated time
+
+The case has its own clock, shown as \`simulatedAt\` in \`status\`. Asking a person or querying a source can cost simulated time, and asking the same thing twice costs it twice; the reply says by how much under \`simulatedTime\`. Nothing else runs on that clock unless the case offers \`advance\`. It exists so that "wait for the audit" has a cost, not to rush you.
 
 ## Your first three commands
 
@@ -234,7 +258,9 @@ Every command that records something needs \`--operation-id\`, a short label you
 
 ## What "not available" means
 
-Only authored facts are official. When a person or source answers "That information is not available in this simulation", the case does not release that fact. That is a signal, not an error: record it as an unknown and decide whether you can proceed without it.
+Only authored facts are official. When a person or source says no answer matches your question, one of two things is true: your wording did not match anything authored, or the case genuinely never measured it. Try once more with one specific thing in plain words. If it still comes back empty, that is your answer: record it as an unknown with \`ledger --kind unknown\` and decide whether you can proceed without it.
+
+A person can also give you a real, authored answer that releases no fact, for example "I have never measured that". The reply says so under \`guidance\`. Treat it the same way: it is information, but it cannot be cited by ID, so record it as an unknown or assumption.
 
 ## Reading the status output
 
@@ -245,6 +271,17 @@ The output is JSON so that you and any tool you use can read it. The important p
 - \`capturedEvidence\`: the evidence IDs you have recorded. \`decision\`, \`requirement\`, and \`claim\` cite these, not the released fact IDs.
 - \`readiness.missing\`: what is still required before submission.
 - \`nextSteps\`: the command that clears each missing item.
+- \`artifactRequirement.satisfied\`: whether the file rule for your chosen response mode is met. Build and pilot responses need a committed file selected at submit; other modes need none, so this reads true from the start.
+- \`stage\`: discovery, then decision once you record one, then response once you draft, then submitted.
+- \`simulatedAt\`: the case clock.
+
+The same claim can be released under two fact IDs when two sources state it, for example a person saying it and a log recording it. Both are valid. Cite the one whose source you relied on, or both. A person may also quote a dataset that the dataset itself answers differently or not at all; each source only knows what was authored for it.
+
+## Response families, decisions, and modes
+
+The README lists response families: shapes a response could take. Your \`decision\` is what you conclude (continue, pivot, buy, collect more evidence, stop). Your \`draft --mode\` is how you would deliver it (build, pilot, buy, data-collection, no-build). They fit together loosely: continue usually pairs with build, pilot, or buy; collect more evidence with data-collection; stop or pivot with no-build. Pick the family in your own words in the draft rationale.
+
+Some replies carry \`reviewSuggested: true\` with a \`reviewSuggestion\` saying why. It is an offer, not a requirement: \`review-request\` with \`--choice continue\` files it and lets you keep working, \`wait\` files it and you pause, \`decline\` files nothing. A staff reply shows up in \`status\` under \`reviewUpdates\`.
 
 ## Saving your work
 
@@ -285,6 +322,8 @@ This folder is a Volta simulation assignment. The person you are helping is the 
 3. Every recording command needs a fresh \`--operation-id\`. Reuse an ID only to retry the same command after a timeout.
 4. A \`ledger --kind fact\` entry must cite a released fact ID. \`decision\`, \`requirement\`, and \`claim\` cite captured evidence IDs from \`capturedEvidence\`, not released fact IDs.
 5. Read command output as JSON. \`readiness.missing\` and \`nextSteps\` say what is still required. \`submit\` checks completeness, never quality.
+6. Only fact ledger entries produce evidence IDs. Assumptions, contradictions, and unknowns are recorded and shown to reviewers but cannot be cited by ID; refer to them in rationale text rather than trying to work around it.
+7. Persona and evidence replies may advance the simulated clock (\`simulatedTime\` in the reply). Tell the student when that happens.
 
 ## Hard rules
 

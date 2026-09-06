@@ -42,6 +42,23 @@ const CHECKPOINT_PROMPTS = [
   "What result would cause you to stop or pivot?",
 ] as const;
 
+/** Reflection prompts belong to meaningful events, not to every bookkeeping reply. */
+const NO_PROMPTS: readonly string[] = [];
+
+const REVIEW_NEXT_STEP =
+  "Optional: run review-request --topic <what you want checked> --choice continue (keep working while staff reply), wait, or decline. Nothing blocks you either way.";
+
+function reviewSuggestion(reason: string) {
+  return { reviewSuggested: true as const, reviewSuggestion: { reason, nextStep: REVIEW_NEXT_STEP } };
+}
+
+const STAGES = {
+  discovery: "discovery",
+  decision: "decision",
+  response: "response",
+  submitted: "submitted",
+} as const;
+
 export class MockServiceError extends Error {
   constructor(
     message: string,
@@ -153,7 +170,7 @@ function preparationFor(
   const requiresArtifact = requestedMode === "build" || requestedMode === "pilot";
   const artifactRequirement = {
     required: requiresArtifact,
-    selected: !requiresArtifact,
+    satisfied: !requiresArtifact,
     minimumCount: requiresArtifact ? (1 as const) : (0 as const),
   };
   const report = requiresArtifact
@@ -220,6 +237,74 @@ function criterionIdsFor(state: MockStudentServiceState, count: number): string[
 }
 
 function viewFor(state: MockStudentServiceState): StudentAssignmentView {
+  const view = activeViewFor(state);
+  return state.attempt.status === "submitted" ? withSubmittedOverlay(state, view) : view;
+}
+
+/**
+ * After acceptance the working draft no longer describes the attempt; the frozen
+ * submission does. Readiness, the artifact rule, and history must say so.
+ */
+function withSubmittedOverlay(
+  state: MockStudentServiceState,
+  view: StudentAssignmentView,
+): StudentAssignmentView {
+  const submission = state.attempt.submission as
+    | {
+        submissionDigest: string;
+        evidence: readonly { officialFactId: string }[];
+        requirementAssessments: readonly { requirementId: string; status: "addressed" | "not-yet" | "not-applicable" }[];
+        responsePlan: { mode: string };
+      }
+    | undefined;
+  if (submission === undefined) return view;
+  const statusByRequirement = new Map(
+    submission.requirementAssessments.map(({ requirementId, status }) => [requirementId, status]),
+  );
+  const report = {
+    complete: true,
+    missing: [],
+    requirements: view.requirements.map(({ id }) => ({
+      requirementId: id,
+      status: statusByRequirement.get(id) ?? ("missing" as const),
+    })),
+    provenance: {
+      citedOfficialFactCount: new Set(submission.evidence.map(({ officialFactId }) => officialFactId)).size,
+      unreleasedFactIds: [],
+    },
+  };
+  const requiresArtifact = submission.responsePlan.mode === "build" || submission.responsePlan.mode === "pilot";
+  return {
+    ...view,
+    requirements: view.requirements.map((requirement) => ({
+      ...requirement,
+      status: statusByRequirement.get(requirement.id) ?? requirement.status,
+    })),
+    completeness: { complete: true, missingPaths: [] },
+    baseReadiness: report,
+    readiness: report,
+    artifactRequirement: {
+      required: requiresArtifact,
+      satisfied: true,
+      minimumCount: requiresArtifact ? (1 as const) : (0 as const),
+    },
+    attemptHistory: [
+      ...view.attemptHistory,
+      {
+        attemptNumber: state.attempt.attemptNumber,
+        status: "submitted" as const,
+        submissionDigest: submission.submissionDigest,
+        eventCount: state.events.length,
+        operationReceiptCount: Object.keys(state.operations ?? {}).length,
+        reasoningHistory: structuredClone(state.reasoningHistory ?? []),
+        calculationHistory: structuredClone(state.calculationHistory ?? []),
+        citedOfficialFactIds: [...new Set(submission.evidence.map(({ officialFactId }) => officialFactId))].sort(),
+      },
+    ],
+  };
+}
+
+function activeViewFor(state: MockStudentServiceState): StudentAssignmentView {
   const context = releasedContext(state);
   const preparation = preparationFor(state);
   const report = preparation.report;
@@ -230,12 +315,14 @@ function viewFor(state: MockStudentServiceState): StudentAssignmentView {
   const factById = new Map(
     context.publishedCase.source.protected.facts.map((fact) => [fact.id, fact]),
   );
+  // A fact re-released by a later similar question is still one fact; keep its first release.
+  const seenFactIds = new Set<string>();
   const releasedEvidence = state.events.flatMap((event) =>
     event.officialFactIds.flatMap((factId) => {
       const fact = factById.get(factId);
-      return fact === undefined
-        ? []
-        : [{ factId, claim: fact.claim, provenance: fact.provenance, eventId: event.eventId }];
+      if (fact === undefined || seenFactIds.has(factId)) return [];
+      seenFactIds.add(factId);
+      return [{ factId, claim: fact.claim, provenance: fact.provenance, eventId: event.eventId }];
     }),
   );
   const capturedLedger = (
@@ -342,6 +429,7 @@ function viewFor(state: MockStudentServiceState): StudentAssignmentView {
       message,
     })),
     stage: state.stage,
+    simulatedAt: state.simulatedAt,
     pendingReview: state.reviewRequests.some(({ status }) => status === "pending"),
     reviewUpdates: state.reviewRequests.map(({ topic, status, response, resolvedAt }) => ({
       topic,
@@ -633,19 +721,34 @@ export class FileBackedMockStudentService implements StudentServiceClient {
           channel: request.kind === "talk" ? "persona" : request.kind === "evidence" ? "evidence" : "collection",
           targetId, question: request.kind === "collect" ? request.plan : request.question,
         }, releasedContext(state).trustedReleasedState);
+        let simulatedTime: { advancedBy: { amount: number; unit: "minutes" | "hours" | "days" }; now: string } | undefined;
         if (resolution.status === "matched") {
           const time = resolution.consequence.time;
           const minutes = time.amount * (time.unit === "days" ? 1440 : time.unit === "hours" ? 60 : 1);
           state.simulatedAt = new Date(Date.parse(state.simulatedAt) + minutes * 60_000).toISOString();
+          if (time.amount > 0) simulatedTime = { advancedBy: { ...time }, now: state.simulatedAt };
         }
+        const alreadyReleased = new Set(state.events.flatMap(({ officialFactIds }) => officialFactIds));
         const event = {
           ...nextEvent(state, request.kind, resolution.studentMessage, resolution.officialFacts.map(({ id }) => id)),
           releasedEvidenceIds: resolution.releasedEvidenceIds,
         };
         state.events.push(event);
+        const releasedSomething = resolution.officialFacts.length > 0;
+        const newFactIds = resolution.officialFacts.map(({ id }) => id).filter((id) => !alreadyReleased.has(id));
+        const guidance = !releasedSomething
+          ? "No official fact was released, so nothing in this reply can be cited by ID. If it matters to your decision, record it with ledger --kind unknown."
+          : newFactIds.length === 0
+            ? `You already had ${resolution.officialFacts.map(({ id }) => id).join(", ")}; asking again released nothing new but still cost simulated time.`
+            : `Released fact ID${newFactIds.length === 1 ? "" : "s"} ${newFactIds.join(", ")}. Cite with ledger --kind fact --statement <your words> --fact-id <id>; the ledger reply then prints the evidence ID to use in decision, requirement, and claim.`;
         return this.#persistOperation(state, request.operationId, requestFingerprint, {
           kind: "action", message: resolution.studentMessage, event,
-          checkpointPrompts: CHECKPOINT_PROMPTS, reviewSuggested: resolution.status === "ambiguous",
+          checkpointPrompts: releasedSomething ? CHECKPOINT_PROMPTS : NO_PROMPTS,
+          ...(resolution.status === "ambiguous"
+            ? reviewSuggestion("Your question matched more than one authored answer, so nothing was released. Rephrase it, or ask staff which reading you meant.")
+            : { reviewSuggested: false }),
+          ...(simulatedTime === undefined ? {} : { simulatedTime }),
+          guidance,
           sandboxWorkBlocked: false, replayed: false,
         });
       }
@@ -746,7 +849,11 @@ export class FileBackedMockStudentService implements StudentServiceClient {
       response = {
         kind: "action",
         message: "Reasoning entry recorded.",
-        checkpointPrompts: CHECKPOINT_PROMPTS,
+        guidance:
+          evidenceIds.length > 0
+            ? `Evidence ID${evidenceIds.length === 1 ? "" : "s"} for citing in decision, requirement, and claim: ${evidenceIds.join(", ")}.`
+            : "This entry is saved and shown to reviewers, but only fact entries get an evidence ID. Refer to it in your rationale text.",
+        checkpointPrompts: NO_PROMPTS,
         reviewSuggested: false,
         sandboxWorkBlocked: false,
         replayed: false,
@@ -757,18 +864,21 @@ export class FileBackedMockStudentService implements StudentServiceClient {
         },
       };
     } else if (request.kind === "decision") {
+      const decisionId = `decision-${request.operationId}`;
       state.workingDraft.decision = DecisionRecordSchema.parse({
         ...request.decision,
-        id: `decision-${request.operationId}`,
+        id: decisionId,
         createdAt: state.simulatedAt,
       });
+      if (state.stage === STAGES.discovery) state.stage = STAGES.decision;
       response = {
         kind: "action",
-        message: "Decision recorded.",
+        message: "Decision recorded. Recording a new decision replaces this one in the working draft.",
         checkpointPrompts: CHECKPOINT_PROMPTS,
-        reviewSuggested: true,
+        ...reviewSuggestion("A recorded decision is a natural point for a staff sanity check before you commit further work to it."),
         sandboxWorkBlocked: false,
         replayed: false,
+        recorded: { kind: "decision", decisionId },
       };
     } else if (request.kind === "estimate") {
       const estimate = EstimateRecordSchema.parse({
@@ -781,10 +891,11 @@ export class FileBackedMockStudentService implements StudentServiceClient {
       response = {
         kind: "action",
         message: "Estimate recorded.",
-        checkpointPrompts: CHECKPOINT_PROMPTS,
+        checkpointPrompts: NO_PROMPTS,
         reviewSuggested: false,
         sandboxWorkBlocked: false,
         replayed: false,
+        recorded: { kind: "estimate", estimateId: estimate.id },
       };
     } else if (request.kind === "requirement") {
       if (request.rationale.trim() === "") {
@@ -808,11 +919,12 @@ export class FileBackedMockStudentService implements StudentServiceClient {
       ];
       response = {
         kind: "action",
-        message: "Requirement status recorded.",
-        checkpointPrompts: CHECKPOINT_PROMPTS,
+        message: "Requirement status recorded. Recording the same requirement again replaces this assessment.",
+        checkpointPrompts: NO_PROMPTS,
         reviewSuggested: false,
         sandboxWorkBlocked: false,
         replayed: false,
+        recorded: { kind: "requirement", requirementId: request.requirementId },
       };
     } else if (request.kind === "claim") {
       if (request.rationale.trim() === "") {
@@ -835,11 +947,12 @@ export class FileBackedMockStudentService implements StudentServiceClient {
       ];
       response = {
         kind: "action",
-        message: "Competency claim recorded.",
-        checkpointPrompts: CHECKPOINT_PROMPTS,
+        message: "Competency claim recorded. Recording the same competency again replaces this claim.",
+        checkpointPrompts: NO_PROMPTS,
         reviewSuggested: false,
         sandboxWorkBlocked: false,
         replayed: false,
+        recorded: { kind: "claim", competencyId: request.competencyId },
       };
     } else if (request.kind === "draft") {
       if (
@@ -860,13 +973,18 @@ export class FileBackedMockStudentService implements StudentServiceClient {
         feasibility: request.feasibility,
         risks: [...request.risks],
       };
+      if (state.stage !== STAGES.submitted) state.stage = STAGES.response;
+      const higherRisk = request.mode === "build" || request.mode === "pilot";
       response = {
         kind: "action",
-        message: "Response plan recorded.",
+        message: "Response plan recorded. Recording another plan replaces this one; the missing-data plan and economic rationale were saved with it.",
         checkpointPrompts: CHECKPOINT_PROMPTS,
-        reviewSuggested: request.mode === "build" || request.mode === "pilot",
+        ...(higherRisk
+          ? reviewSuggestion("A build or pilot response carries more risk than measuring or not building, so staff may want to look before you invest in it.")
+          : { reviewSuggested: false }),
         sandboxWorkBlocked: false,
         replayed: false,
+        recorded: { kind: "draft", mode: request.mode },
       };
     } else if (request.kind === "criterion") {
       const { criterion } = request;
@@ -899,7 +1017,7 @@ export class FileBackedMockStudentService implements StudentServiceClient {
       response = {
         kind: "action",
         message: "Success criterion recorded.",
-        checkpointPrompts: CHECKPOINT_PROMPTS,
+        checkpointPrompts: NO_PROMPTS,
         reviewSuggested: false,
         sandboxWorkBlocked: false,
         replayed: false,
@@ -936,7 +1054,7 @@ export class FileBackedMockStudentService implements StudentServiceClient {
       response = {
         kind: "action",
         message: "Success criterion removed from the working draft. Its action history is unchanged.",
-        checkpointPrompts: CHECKPOINT_PROMPTS,
+        checkpointPrompts: NO_PROMPTS,
         reviewSuggested: false,
         sandboxWorkBlocked: false,
         replayed: false,
@@ -961,7 +1079,7 @@ export class FileBackedMockStudentService implements StudentServiceClient {
         kind: "action",
         message: "Reproducible calculation recorded.",
         recorded: { kind: "calculation", calculationId: calculation.id },
-        checkpointPrompts: CHECKPOINT_PROMPTS,
+        checkpointPrompts: NO_PROMPTS,
         reviewSuggested: false,
         sandboxWorkBlocked: false,
         replayed: false,
@@ -977,7 +1095,7 @@ export class FileBackedMockStudentService implements StudentServiceClient {
       }];
       response = { kind: "action", message: "Calculation removed from the draft; its full history is preserved.",
         recorded: { kind: "calculation-removal", calculationId: request.calculationId },
-        checkpointPrompts: CHECKPOINT_PROMPTS, reviewSuggested: false, sandboxWorkBlocked: false, replayed: false };
+        checkpointPrompts: NO_PROMPTS, reviewSuggested: false, sandboxWorkBlocked: false, replayed: false };
     } else if (request.kind === "review-request") {
       if (request.studentChoice !== "decline") {
         state.reviewRequests.push({
@@ -993,9 +1111,9 @@ export class FileBackedMockStudentService implements StudentServiceClient {
         message:
           request.studentChoice === "decline"
             ? "Review suggestion declined. You may continue working."
-            : "Staff review requested. You may continue working while it is pending.",
-        checkpointPrompts: CHECKPOINT_PROMPTS,
-        reviewSuggested: true,
+            : "Staff review requested. You may continue working while it is pending; a reply appears in status under reviewUpdates.",
+        checkpointPrompts: NO_PROMPTS,
+        reviewSuggested: false,
         sandboxWorkBlocked: false,
         replayed: false,
       };
@@ -1026,6 +1144,7 @@ export class FileBackedMockStudentService implements StudentServiceClient {
         },
       );
       state.attempt = structuredClone(result.attempt) as MockStudentServiceState["attempt"];
+      if (result.accepted) state.stage = STAGES.submitted;
       response = {
         kind: "submission",
         accepted: result.accepted,
