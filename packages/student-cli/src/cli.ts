@@ -9,6 +9,7 @@ import {
   missingSessionMessage,
   readinessNextSteps,
   studentGuideMarkdown,
+  submittedNextSteps,
 } from "./guide.js";
 import { commandHelp, globalHelp } from "./help.js";
 import {
@@ -502,12 +503,15 @@ function printResponse(
     return;
   }
   if (response.kind === "view") {
-    const nextSteps = readinessNextSteps({
+    const nextSteps =
+      response.view.attemptStatus === "submitted"
+        ? submittedNextSteps(response.view.attemptNumber, commandName)
+        : readinessNextSteps({
       missing: response.view.readiness.missing,
       requirements: response.view.readiness.requirements,
-      artifactRequirement: response.view.artifactRequirement,
-      commandName,
-    });
+            artifactRequirement: response.view.artifactRequirement,
+            commandName,
+          });
     io.writeOut(JSON.stringify({ ...response, nextSteps }, null, 2));
     return;
   }

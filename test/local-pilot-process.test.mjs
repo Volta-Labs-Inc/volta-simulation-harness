@@ -191,6 +191,8 @@ test(
       "pilot-login",
     ]);
     expect(login.stdout).toContain("Signed in for assignment");
+    expect(login.stdout).toContain("Next: run node '");
+    expect(login.stdout).not.toContain("volta-sim-local --manifest");
     const status = await runLocalStudent(assignmentRoot, manifestPath, ["status"]);
     const studentView = JSON.parse(status.stdout).view;
     expect(studentView).toMatchObject({
