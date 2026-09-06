@@ -1,5 +1,6 @@
 export * from "./artifacts.js";
 export * from "./cli.js";
+export * from "./guide.js";
 export * from "./http-client.js";
 export * from "./local-cli.js";
 export * from "./local-http-service.js";

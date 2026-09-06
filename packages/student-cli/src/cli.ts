@@ -2,6 +2,14 @@ import { SubmissionDraftSchema } from "@volta-sim/contracts";
 import { z } from "zod";
 
 import { HttpStudentServiceClient } from "./http-client.js";
+import {
+  DEFAULT_COMMAND_NAME,
+  loginNextSteps,
+  missingOperationIdMessage,
+  missingSessionMessage,
+  readinessNextSteps,
+  studentGuideMarkdown,
+} from "./guide.js";
 import { commandHelp, globalHelp } from "./help.js";
 import {
   readPendingSubmission,
@@ -153,6 +161,8 @@ export interface RunCliOptions {
   readonly client?: StudentServiceClient;
   readonly assignmentRoot?: string;
   readonly io?: CliIo;
+  /** The exact text a student types before a command, used in guidance messages. */
+  readonly commandName?: string;
 }
 
 function parseArguments(argv: readonly string[]): ParsedArguments {
@@ -190,7 +200,14 @@ function parseArguments(argv: readonly string[]): ParsedArguments {
   return { command, flags };
 }
 
-function parsedOperationId(flags: ReadonlyMap<string, readonly string[]>): string {
+function parsedOperationId(
+  flags: ReadonlyMap<string, readonly string[]>,
+  command = "this command",
+  commandName = DEFAULT_COMMAND_NAME,
+): string {
+  if (flags.get("operation-id")?.[0] === undefined) {
+    throw new Error(missingOperationIdMessage(command, commandName));
+  }
   const value = required(flags, "operation-id");
   if (!/^[A-Za-z0-9][A-Za-z0-9._:-]{0,159}$/.test(value)) {
     throw new Error("Provide an operation id of at most 160 safe characters");
@@ -264,9 +281,9 @@ function normalizedTargetDate(flags: ReadonlyMap<string, readonly string[]>): st
   );
 }
 
-function actionRequest(parsed: ParsedArguments): StudentServiceRequest {
+function actionRequest(parsed: ParsedArguments, commandName: string): StudentServiceRequest {
   const flags = parsed.flags;
-  const operationId = parsedOperationId(flags);
+  const operationId = parsedOperationId(flags, parsed.command, commandName);
   switch (parsed.command) {
     case "talk":
       return {
@@ -474,9 +491,34 @@ function actionRequest(parsed: ParsedArguments): StudentServiceRequest {
   }
 }
 
-function printResponse(response: StudentServiceResponse, io: CliIo): void {
+function printResponse(
+  response: StudentServiceResponse,
+  io: CliIo,
+  commandName = DEFAULT_COMMAND_NAME,
+): void {
   if (response.kind === "login") {
     io.writeOut(`Signed in for assignment ${response.assignmentId}. The token was saved locally.`);
+    for (const line of loginNextSteps(commandName)) io.writeOut(line);
+    return;
+  }
+  if (response.kind === "view") {
+    const nextSteps = readinessNextSteps({
+      missing: response.view.readiness.missing,
+      requirements: response.view.readiness.requirements,
+      artifactRequirement: response.view.artifactRequirement,
+      commandName,
+    });
+    io.writeOut(JSON.stringify({ ...response, nextSteps }, null, 2));
+    return;
+  }
+  if (response.kind === "preparation") {
+    const nextSteps = readinessNextSteps({
+      missing: response.baseReport.missing,
+      requirements: response.baseReport.requirements,
+      artifactRequirement: response.artifactRequirement,
+      commandName,
+    });
+    io.writeOut(JSON.stringify({ ...response, nextSteps }, null, 2));
     return;
   }
   io.writeOut(JSON.stringify(response, null, 2));
@@ -489,10 +531,15 @@ export async function runCli(argv: readonly string[], options: RunCliOptions = {
       writeOut: (value: string) => process.stdout.write(`${value}\n`),
       writeError: (value: string) => process.stderr.write(`${value}\n`),
     } satisfies CliIo);
+  const commandName = options.commandName ?? DEFAULT_COMMAND_NAME;
   try {
     const help = requestedHelp(argv);
     if (help !== undefined) {
       io.writeOut(help);
+      return 0;
+    }
+    if (argv.length === 1 && argv[0] === "guide") {
+      io.writeOut(studentGuideMarkdown({ commandName }));
       return 0;
     }
     const parsed = parseArguments(argv);
@@ -504,7 +551,7 @@ export async function runCli(argv: readonly string[], options: RunCliOptions = {
     if (parsed.command === "login") {
       const response = await client.execute({
         kind: "login",
-        operationId: parsedOperationId(parsed.flags),
+        operationId: parsedOperationId(parsed.flags, "login", commandName),
       });
       if (response.kind !== "login") throw new Error("The service did not complete sign-in");
       await new GitCliRepositoryVerifier({
@@ -518,18 +565,20 @@ export async function runCli(argv: readonly string[], options: RunCliOptions = {
         token: response.token,
         repository: response.repository,
       });
-      printResponse(response, io);
+      printResponse(response, io, commandName);
       return 0;
     }
 
-    const session = await readStudentSession(assignmentRoot, FIXED_SESSION_PATH);
+    const session = await readStudentSession(assignmentRoot, FIXED_SESSION_PATH).catch(() => {
+      throw new Error(missingSessionMessage(commandName));
+    });
     await new GitCliRepositoryVerifier({
       repositorySlug: session.repository.slug,
       commitSha: session.repository.commitSha,
       sessionIgnoreBlobId: session.repository.sessionIgnoreBlobId,
     }).verify(assignmentRoot, []);
     if (parsed.command === "resume" || parsed.command === "status") {
-      printResponse(await client.execute({ kind: parsed.command }, session.token), io);
+      printResponse(await client.execute({ kind: parsed.command }, session.token), io, commandName);
       return 0;
     }
     if (parsed.command === "checkpoint") {
@@ -537,7 +586,7 @@ export async function runCli(argv: readonly string[], options: RunCliOptions = {
       return 0;
     }
     if (parsed.command === "submit") {
-      const submitOperationId = parsedOperationId(parsed.flags);
+      const submitOperationId = parsedOperationId(parsed.flags, "submit", commandName);
       const pending = await readPendingSubmission(assignmentRoot);
       if (pending !== undefined) {
         if (pending.operationId !== submitOperationId) {
@@ -567,7 +616,7 @@ export async function runCli(argv: readonly string[], options: RunCliOptions = {
         preparation.submissionBase === undefined ||
         preparation.requestedMode === undefined
       ) {
-        printResponse(preparation, io);
+        printResponse(preparation, io, commandName);
         return 1;
       }
       const submissionBase = preparation.submissionBase;
@@ -617,7 +666,7 @@ export async function runCli(argv: readonly string[], options: RunCliOptions = {
       return response.accepted ? 0 : 1;
     }
 
-    const response = await client.execute(actionRequest(parsed), session.token);
+    const response = await client.execute(actionRequest(parsed, commandName), session.token);
     if (parsed.command === "logout") {
       await removeStudentSession(assignmentRoot, FIXED_SESSION_PATH);
     }

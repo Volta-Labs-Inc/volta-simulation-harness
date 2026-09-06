@@ -6,6 +6,9 @@ import { z } from "zod";
 import { runCli, type CliIo } from "./cli.js";
 import { HttpStudentServiceClient } from "./http-client.js";
 
+/** What a local-pilot student types before a command; the launcher prints the full node form. */
+export const LOCAL_COMMAND_NAME = "volta-sim-local --manifest .volta-sim/local-pilot.json";
+
 const DigestSchema = z.string().regex(/^sha256:[a-f0-9]{64}$/u);
 const LocalPilotManifestSchema = z
   .object({
@@ -142,6 +145,7 @@ export async function runLocalCli(
     return runCli(argv.slice(2), {
       assignmentRoot: manifest.assignmentRoot,
       client: new HttpStudentServiceClient(manifest.serviceOrigin),
+      commandName: LOCAL_COMMAND_NAME,
       io,
     });
   } catch (error) {
