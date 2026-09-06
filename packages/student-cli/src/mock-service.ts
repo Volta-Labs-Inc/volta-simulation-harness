@@ -237,6 +237,74 @@ function criterionIdsFor(state: MockStudentServiceState, count: number): string[
 }
 
 function viewFor(state: MockStudentServiceState): StudentAssignmentView {
+  const view = activeViewFor(state);
+  return state.attempt.status === "submitted" ? withSubmittedOverlay(state, view) : view;
+}
+
+/**
+ * After acceptance the working draft no longer describes the attempt; the frozen
+ * submission does. Readiness, the artifact rule, and history must say so.
+ */
+function withSubmittedOverlay(
+  state: MockStudentServiceState,
+  view: StudentAssignmentView,
+): StudentAssignmentView {
+  const submission = state.attempt.submission as
+    | {
+        submissionDigest: string;
+        evidence: readonly { officialFactId: string }[];
+        requirementAssessments: readonly { requirementId: string; status: "addressed" | "not-yet" | "not-applicable" }[];
+        responsePlan: { mode: string };
+      }
+    | undefined;
+  if (submission === undefined) return view;
+  const statusByRequirement = new Map(
+    submission.requirementAssessments.map(({ requirementId, status }) => [requirementId, status]),
+  );
+  const report = {
+    complete: true,
+    missing: [],
+    requirements: view.requirements.map(({ id }) => ({
+      requirementId: id,
+      status: statusByRequirement.get(id) ?? ("missing" as const),
+    })),
+    provenance: {
+      citedOfficialFactCount: new Set(submission.evidence.map(({ officialFactId }) => officialFactId)).size,
+      unreleasedFactIds: [],
+    },
+  };
+  const requiresArtifact = submission.responsePlan.mode === "build" || submission.responsePlan.mode === "pilot";
+  return {
+    ...view,
+    requirements: view.requirements.map((requirement) => ({
+      ...requirement,
+      status: statusByRequirement.get(requirement.id) ?? requirement.status,
+    })),
+    completeness: { complete: true, missingPaths: [] },
+    baseReadiness: report,
+    readiness: report,
+    artifactRequirement: {
+      required: requiresArtifact,
+      satisfied: true,
+      minimumCount: requiresArtifact ? (1 as const) : (0 as const),
+    },
+    attemptHistory: [
+      ...view.attemptHistory,
+      {
+        attemptNumber: state.attempt.attemptNumber,
+        status: "submitted" as const,
+        submissionDigest: submission.submissionDigest,
+        eventCount: state.events.length,
+        operationReceiptCount: Object.keys(state.operations ?? {}).length,
+        reasoningHistory: structuredClone(state.reasoningHistory ?? []),
+        calculationHistory: structuredClone(state.calculationHistory ?? []),
+        citedOfficialFactIds: [...new Set(submission.evidence.map(({ officialFactId }) => officialFactId))].sort(),
+      },
+    ],
+  };
+}
+
+function activeViewFor(state: MockStudentServiceState): StudentAssignmentView {
   const context = releasedContext(state);
   const preparation = preparationFor(state);
   const report = preparation.report;

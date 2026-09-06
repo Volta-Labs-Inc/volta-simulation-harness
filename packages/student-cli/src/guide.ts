@@ -124,6 +124,8 @@ export function readinessNextSteps(input: ReadinessGuidanceInput): string[] {
   }
   const firstByRoot = new Map<string, string | undefined>();
   for (const { path, message } of input.missing) {
+    // The artifact rule has its own step below; it is not a reason to re-run draft.
+    if (path === "responsePlan.artifactSnapshots") continue;
     const rootPath = path.split(".")[0] ?? path;
     if (!firstByRoot.has(rootPath)) firstByRoot.set(rootPath, message);
   }
@@ -273,7 +275,11 @@ The output is JSON so that you and any tool you use can read it. The important p
 - \`stage\`: discovery, then decision once you record one, then response once you draft, then submitted.
 - \`simulatedAt\`: the case clock.
 
-The same claim can be released under two fact IDs when two sources state it, for example a person saying it and a log recording it. Both are valid. Cite the one whose source you relied on, or both.
+The same claim can be released under two fact IDs when two sources state it, for example a person saying it and a log recording it. Both are valid. Cite the one whose source you relied on, or both. A person may also quote a dataset that the dataset itself answers differently or not at all; each source only knows what was authored for it.
+
+## Response families, decisions, and modes
+
+The README lists response families: shapes a response could take. Your \`decision\` is what you conclude (continue, pivot, buy, collect more evidence, stop). Your \`draft --mode\` is how you would deliver it (build, pilot, buy, data-collection, no-build). They fit together loosely: continue usually pairs with build, pilot, or buy; collect more evidence with data-collection; stop or pivot with no-build. Pick the family in your own words in the draft rationale.
 
 Some replies carry \`reviewSuggested: true\` with a \`reviewSuggestion\` saying why. It is an offer, not a requirement: \`review-request\` with \`--choice continue\` files it and lets you keep working, \`wait\` files it and you pause, \`decline\` files nothing. A staff reply shows up in \`status\` under \`reviewUpdates\`.
 

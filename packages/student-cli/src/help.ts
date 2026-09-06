@@ -84,7 +84,9 @@ Allowed --kind values:
 
 A fact must cite at least one fact ID shown under status.releasedEvidence. Other kinds must not cite fact IDs. The response prints the captured evidence IDs used by decision, requirement, and claim.
 
-Only fact entries produce evidence IDs. Assumptions, contradictions, and unknowns are still part of your submission and are shown to reviewers; refer to them in your rationale text.
+Only fact entries produce evidence IDs. Assumptions, contradictions, and unknowns are still part of your submission and are shown to reviewers; refer to them in your rationale text. The evidence IDs appear in the reply under recorded.evidenceIds and guidance.
+
+The fact ID is whatever status.releasedEvidence shows, for example log-median-wait from the desk log or median-wait from Morgan.
 
 Example:
   volta-sim ledger --operation-id ledger-1 --kind fact --statement "Median first response time is 18 minutes." --fact-id log-median-wait`,

@@ -145,6 +145,13 @@ export function calculationIntegrityIssue(calculation: CalculationRecord): strin
   if (calculation.formula.operation === "percentage-change" && calculation.result.unit !== "percent") {
     return "Percentage change results must use the percent unit";
   }
+  if (
+    calculation.formula.operation === "quotient" &&
+    inputUnits.size === 1 &&
+    inputUnits.has(calculation.result.unit)
+  ) {
+    return "Dividing a unit by the same unit gives a ratio; name the result ratio, percent, or a per-unit rate, not the input unit";
+  }
   return undefined;
 }
 

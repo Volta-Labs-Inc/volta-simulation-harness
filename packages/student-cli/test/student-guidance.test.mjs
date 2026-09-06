@@ -3,6 +3,7 @@ import path from "node:path";
 import { afterEach, describe, expect, test } from "vitest";
 import { FileBackedMockStudentService } from "../src/mock-service.ts";
 import { commandHelp } from "../src/help.ts";
+import { readinessNextSteps } from "../src/guide.ts";
 import { createStudentFixture } from "./fixture.ts";
 
 const roots = [];
@@ -97,7 +98,8 @@ describe("natural questions land on the right authored answer", () => {
     ["What kinds of questions can the clerk not answer directly?", ["intake-process"]],
     ["How long do patrons wait for an answer?", ["median-wait"]],
     ["Why do you want to reduce the wait time?", ["manager-goal"]],
-    ["What is the wait time for questions that go on a slip?", ["intake-process"]],
+    ["What is the wait time for questions that go on a slip?", ["median-wait"]],
+    ["How long do patrons typically wait for a specialist answer?", ["median-wait"]],
   ])("persona: %s", async (question, factIds) => {
     const { talk } = await session(fixture());
     expect((await talk("q", question)).event.officialFactIds).toEqual(factIds);
@@ -132,6 +134,95 @@ describe("natural questions land on the right authored answer", () => {
   ])("desk log never answers with the wrong number: %s", async (question) => {
     const { evidence } = await session(fixture());
     expect((await evidence("q", question)).event.officialFactIds).toEqual([]);
+  });
+});
+
+describe("third-run findings", () => {
+  test.each([
+    ["What is the average time a patron waits for an answer?", ["log-median-wait"]],
+    ["What is the median first response time?", ["log-median-wait"]],
+    ["What does first response time mean?", ["log-first-response-definition"]],
+  ])("desk log: %s", async (question, factIds) => {
+    const { evidence } = await session(fixture());
+    expect((await evidence("q", question)).event.officialFactIds).toEqual(factIds);
+  });
+
+  test.each([
+    ["How many questions does the front desk get per day?", /does not count questions/u],
+    ["Does the front desk have a computer?", /nothing to share/u],
+    ["Who is the specialist and what hours do they work?", /nothing to share/u],
+  ])("persona refuses a detail it was never given instead of repeating intake: %s", async (question, pattern) => {
+    const { talk } = await session(fixture());
+    const reply = await talk("q", question);
+    expect(reply.event.officialFactIds).toEqual([]);
+    expect(reply.message).toMatch(pattern);
+  });
+
+  test("the log explains it cannot split clerk from specialist", async () => {
+    const { evidence } = await session(fixture());
+    const reply = await evidence("q", "How long did specialist questions take?");
+    expect(reply.event.officialFactIds).toEqual([]);
+    expect(reply.message).toMatch(/cannot split/u);
+  });
+
+  test("dividing minutes by minutes cannot be recorded as minutes", async () => {
+    const value = fixture();
+    const { service, token } = await session(value);
+    const calculation = {
+      name: "Ratio",
+      inputs: [
+        { name: "a", value: 18, unit: "minutes", source: "log" },
+        { name: "b", value: 9, unit: "minutes", source: "target" },
+      ],
+      formula: { operation: "quotient", inputNames: ["a", "b"] },
+      result: { value: 2, unit: "minutes" },
+      rationale: "Wrong unit.",
+    };
+    await expect(
+      service.execute({ kind: "calculation", operationId: "calc-1", calculation }, token),
+    ).rejects.toThrow(/ratio/u);
+    const ok = await service.execute(
+      { kind: "calculation", operationId: "calc-2", calculation: { ...calculation, result: { value: 2, unit: "ratio" } } },
+      token,
+    );
+    expect(ok.recorded.kind).toBe("calculation");
+  });
+
+  test("a missing artifact is not reported as a missing draft", () => {
+    const steps = readinessNextSteps({
+      missing: [{ path: "responsePlan.artifactSnapshots", message: "Select at least one tracked artifact" }],
+      artifactRequirement: { required: true, satisfied: false },
+    });
+    expect(steps).toHaveLength(1);
+    expect(steps[0]).toContain("submit --operation-id <your-id> --artifact");
+    expect(steps[0]).not.toContain("draft");
+  });
+
+  test("after acceptance, status reports the frozen submission as complete and in history", async () => {
+    const value = fixture();
+    value.state.workingDraft = JSON.parse(JSON.stringify(value.draft));
+    fs.writeFileSync(path.join(value.serviceRoot, value.statePath), JSON.stringify(value.state));
+    const { service, token, status } = await session(value);
+    const preparation = await service.execute({ kind: "prepare-submission" }, token);
+    expect(preparation.ready).toBe(true);
+    const submission = await service.execute(
+      {
+        kind: "submit", operationId: "submit-1", draft: preparation.submissionBase,
+        artifacts: [], repository: { repositorySlug: "Volta-Labs-Inc/assignment-1", commitSha: value.commitSha, sessionIgnoreBlobId: value.sessionIgnoreBlobId, selectedBlobs: [] },
+        mode: "no-build",
+      },
+      token,
+    );
+    expect(submission.accepted).toBe(true);
+    const view = await status();
+    expect(view.attemptStatus).toBe("submitted");
+    expect(view.readiness).toMatchObject({ complete: true, missing: [] });
+    expect(view.completeness).toEqual({ complete: true, missingPaths: [] });
+    expect(view.artifactRequirement.satisfied).toBe(true);
+    expect(view.attemptHistory.map(({ attemptNumber, submissionDigest }) => [attemptNumber, submissionDigest])).toEqual([
+      [1, submission.submissionDigest],
+    ]);
+    expect(view.stage).toBe("submitted");
   });
 });
 
