@@ -320,7 +320,7 @@ describe("deterministic authored fact release", () => {
     ).toEqual({
       status: "unavailable",
       reason: "out-of-universe",
-      studentMessage: "That information is not available in this simulation.",
+      studentMessage: nonAssessedLibraryRoutingCase.protected.outOfUniverse?.studentMessage,
       officialFacts: [],
       releasedEvidenceIds: [],
     });
@@ -369,6 +369,8 @@ describe("deterministic authored fact release", () => {
 
   it("respects authored complete cue groups and exclusions", () => {
     const groupedSource = structuredClone(nonAssessedLibraryRoutingCase);
+    // This test exercises cue semantics on one route, so drop the other authored persona routes.
+    groupedSource.protected.routes = [groupedSource.protected.routes[0]!];
     groupedSource.protected.routes[0]!.match = {
       anyPhrases: [],
       allTerms: [],

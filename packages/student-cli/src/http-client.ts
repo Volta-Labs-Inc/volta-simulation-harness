@@ -54,7 +54,7 @@ const EventSchema = z.object({
 });
 const ArtifactRequirementSchema = z.object({
   required: z.boolean(),
-  selected: z.boolean(),
+  satisfied: z.boolean(),
   minimumCount: z.union([z.literal(0), z.literal(1)]),
 });
 const CriterionSchema = z.object({
@@ -172,6 +172,7 @@ const ViewSchema = z.object({
   ),
   stage: z.string(),
   pendingReview: z.boolean(),
+  simulatedAt: z.string().datetime({ offset: true }),
   reviewUpdates: z.array(
     z.object({
       topic: z.string(),
@@ -215,6 +216,17 @@ const ResponseSchema = z.union([
     event: EventSchema.optional(),
     checkpointPrompts: z.array(z.string()),
     reviewSuggested: z.boolean(),
+    reviewSuggestion: z.object({ reason: z.string(), nextStep: z.string() }).optional(),
+    simulatedTime: z
+      .object({
+        advancedBy: z.object({
+          amount: z.number().int().nonnegative(),
+          unit: z.enum(["minutes", "hours", "days"]),
+        }),
+        now: z.string().datetime({ offset: true }),
+      })
+      .optional(),
+    guidance: z.string().optional(),
     sandboxWorkBlocked: z.literal(false),
     replayed: z.boolean(),
     recorded: z
@@ -228,6 +240,11 @@ const ResponseSchema = z.union([
         z.object({ kind: z.literal("criterion-removal"), criterionId: z.string() }),
         z.object({ kind: z.literal("calculation"), calculationId: z.string() }),
         z.object({ kind: z.literal("calculation-removal"), calculationId: z.string() }),
+        z.object({ kind: z.literal("estimate"), estimateId: z.string() }),
+        z.object({ kind: z.literal("decision"), decisionId: z.string() }),
+        z.object({ kind: z.literal("requirement"), requirementId: z.string() }),
+        z.object({ kind: z.literal("claim"), competencyId: z.string() }),
+        z.object({ kind: z.literal("draft"), mode: z.string() }),
       ])
       .optional(),
   }),

@@ -39,7 +39,7 @@ Example:
   volta-sim login --operation-id login-1`,
   resume: `Usage: volta-sim resume
 
-Shows the current assignment and does not change simulation state.
+Shows the current assignment and does not change simulation state. Use it after a break to see where you left off.
 
 Example:
   volta-sim resume`,
@@ -51,13 +51,13 @@ Example:
   volta-sim status`,
   talk: `Usage: volta-sim talk --operation-id <safe-id> --persona <persona-id> --question <text>
 
-Use a persona ID shown by status.
+Use a persona ID shown by status. Personas answer only what the case authored for them. Ask one specific thing in plain words; a reply that no answer matches means either rephrase or record an unknown. Some answers advance the simulated clock; the response shows by how much.
 
 Example:
-  volta-sim talk --operation-id talk-1 --persona library-manager --question "What outcome would make this worth addressing?"`,
+  volta-sim talk --operation-id talk-1 --persona library-manager --question "Can you walk me through the current intake process?"`,
   evidence: `Usage: volta-sim evidence --operation-id <safe-id> --source <evidence-source-id> --question <text>
 
-Use an evidence-source ID shown by status. The command name request is an alias.
+Use an evidence-source ID shown by status. The command name request is an alias. Querying a source usually advances the simulated clock; the response shows by how much.
 
 Example:
   volta-sim evidence --operation-id evidence-1 --source desk-log --question "What baseline does the released sample support?"`,
@@ -84,8 +84,10 @@ Allowed --kind values:
 
 A fact must cite at least one fact ID shown under status.releasedEvidence. Other kinds must not cite fact IDs. The response prints the captured evidence IDs used by decision, requirement, and claim.
 
+Only fact entries produce evidence IDs. Assumptions, contradictions, and unknowns are still part of your submission and are shown to reviewers; refer to them in your rationale text.
+
 Example:
-  volta-sim ledger --operation-id ledger-1 --kind fact --statement "Median response time is 18 minutes." --fact-id median-wait`,
+  volta-sim ledger --operation-id ledger-1 --kind fact --statement "Median first response time is 18 minutes." --fact-id log-median-wait`,
   decision: `Usage: volta-sim decision --operation-id <safe-id> --choice <value> --rationale <text> [--evidence-id <captured-evidence-id> ...] --expected-evidence <tuple> [--expected-evidence <tuple> ...] --pivot-condition <tuple> [--pivot-condition <tuple> ...]
 
 Allowed --choice values:
@@ -97,7 +99,7 @@ Formats:
   --pivot-condition   pivot-or-stop|condition|rationale
 
 Example:
-  volta-sim decision --operation-id decision-1 --choice collect-more-evidence --rationale "Accuracy is unknown." --evidence-id evidence-ledger-1-median-wait --expected-evidence "Accuracy sample|Sample audit|Decide whether to proceed" --pivot-condition "stop|Accuracy falls|Protect answer quality"`,
+  volta-sim decision --operation-id decision-1 --choice collect-more-evidence --rationale "Accuracy is unknown." --evidence-id evidence-ledger-1-log-median-wait --expected-evidence "Accuracy sample|Sample audit|Decide whether to proceed" --pivot-condition "stop|Accuracy falls|Protect answer quality"`,
   estimate: `Usage: volta-sim estimate --operation-id <safe-id> --subject <text> --low <number> --high <number> --unit <text> --assumption <text> [--assumption <text> ...] --confidence <0-1>
 
 The high value must be at least the low value. Confidence is a decimal from 0 to 1.
@@ -112,16 +114,16 @@ Allowed --status values:
 Use requirement IDs shown by status and evidence IDs printed by ledger or status.capturedEvidence.
 
 Example:
-  volta-sim requirement --operation-id requirement-1 --id patron-wait --status not-yet --rationale "The target and accuracy baseline are missing." --evidence-id evidence-ledger-1-median-wait`,
+  volta-sim requirement --operation-id requirement-1 --id patron-wait --status not-yet --rationale "The target and accuracy baseline are missing." --evidence-id evidence-ledger-1-log-median-wait`,
   claim: `Usage: volta-sim claim --operation-id <safe-id> --competency <value> --rationale <text> [--evidence-id <captured-evidence-id> ...]
 
 Allowed --competency values:
   problem-viability | evidence-sufficiency | response-feasibility | objective-success-criteria
 
-Each submission needs exactly one claim for every listed competency.
+Each submission needs exactly one claim for every listed competency. The competency IDs above are shown next to each heading in method.md and under status.rubric. Evidence IDs come from fact ledger entries only; mention assumptions and unknowns in the rationale.
 
 Example:
-  volta-sim claim --operation-id claim-1 --competency evidence-sufficiency --rationale "I separated the released baseline from unknown accuracy." --evidence-id evidence-ledger-1-median-wait`,
+  volta-sim claim --operation-id claim-1 --competency evidence-sufficiency --rationale "I separated the released baseline from unknown accuracy." --evidence-id evidence-ledger-1-log-median-wait`,
   criterion: `Usage: volta-sim criterion --operation-id <safe-id> --metric <text> (--baseline <text> | --baseline-plan <text>) --target <text> --target-date <date> --failure-threshold <text>
 
 Target date format:
@@ -164,7 +166,7 @@ Example:
   volta-sim draft --operation-id draft-1 --mode data-collection --rationale "Measure before committing." --feasibility "A bounded audit is available." --risk "The sample may be unrepresentative." --missing-data-plan "Measure accuracy and volume." --economic-rationale "Do not invent savings before volume is known."`,
   checkpoint: `Usage: volta-sim checkpoint
 
-Shows reflection prompts and does not change simulation state.
+Shows reflection prompts and does not change simulation state. The same prompts appear after meaningful events such as a released fact, a decision, or a response plan.
 
 Example:
   volta-sim checkpoint`,

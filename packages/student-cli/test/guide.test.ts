@@ -104,7 +104,7 @@ describe("student onboarding guide", () => {
     const steps = readinessNextSteps({
       missing: FRESH_MISSING_PATHS.map((path) => ({ path, message: "Required" })),
       requirements: [{ requirementId: "patron-wait", status: "missing" }],
-      artifactRequirement: { required: false, selected: true },
+      artifactRequirement: { required: false, satisfied: true },
     });
     const commandsInOrder = steps.map((step) => /: volta-sim (\S+)/u.exec(step)?.[1]);
     expect(commandsInOrder).toEqual([
@@ -115,8 +115,6 @@ describe("student onboarding guide", () => {
       "decision",
       "criterion",
       "draft",
-      "draft",
-      "draft",
       "claim",
       "requirement",
     ]);
@@ -124,11 +122,35 @@ describe("student onboarding guide", () => {
     expect(steps.at(-1)).toContain("--id patron-wait");
   });
 
+  it("points to discovery first when nothing has been released", () => {
+    const steps = readinessNextSteps({
+      missing: FRESH_MISSING_PATHS.map((path) => ({ path, message: "Required" })),
+      releasedFactCount: 0,
+      personaIds: ["library-manager"],
+      evidenceSourceIds: ["desk-log"],
+    });
+    expect(steps[0]).toContain("start with discovery");
+    expect(steps[0]).toContain("talk --operation-id <your-id> --persona library-manager");
+    expect(steps[0]).toContain("evidence --operation-id <your-id> --source desk-log");
+    const afterRelease = readinessNextSteps({
+      missing: FRESH_MISSING_PATHS.map((path) => ({ path, message: "Required" })),
+      releasedFactCount: 1,
+    });
+    expect(afterRelease[0]).not.toContain("start with discovery");
+  });
+
+  it("still names the draft fields when the plan exists but a field is empty", () => {
+    const steps = readinessNextSteps({
+      missing: [{ path: "missingDataPlan", message: "Required" }],
+    });
+    expect(steps).toEqual([expect.stringContaining("draft ... --missing-data-plan")]);
+  });
+
   it("names the artifact rule for build responses and the submit command when complete", () => {
     expect(
       readinessNextSteps({
         missing: [],
-        artifactRequirement: { required: true, selected: false },
+        artifactRequirement: { required: true, satisfied: false },
       }),
     ).toEqual([expect.stringContaining("submit --operation-id <your-id> --artifact")]);
     expect(readinessNextSteps({ missing: [] })).toEqual([
