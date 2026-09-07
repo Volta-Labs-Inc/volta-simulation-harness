@@ -4,6 +4,10 @@ This repository is the public, reusable engine for evidence-led student simulati
 
 ## Product rules
 
+- Default generated problems to small businesses unless the user explicitly requests another setting. Write character speech in conversational plain English. Keep buyer-role and JTBD terminology in teaching notes, not in characters' mouths. Explain who pays, who does the work and who looks after the tools through everyday examples.
+
+- When generating or authoring a problem, follow `packages/authoring/PERSONA-GENERATION.md`. Every character needs a private developed persona and JTBD; every case must identify Economic, Functional and Technical buyers, their authority and alignment. Validate the case before practice. Use separate interview chats with stored transcripts.
+
 - A simulation joins discovery and a proportionate build or experiment in one case.
 - The student may conclude continue, pivot, buy, collect more evidence, or stop.
 - Official facts come only from the frozen case universe. A language model may render those facts but may never choose, add, or alter them.

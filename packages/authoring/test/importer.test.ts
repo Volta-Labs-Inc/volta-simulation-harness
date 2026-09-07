@@ -4,6 +4,7 @@ import path from "node:path";
 import { CaseVersionSourceSchema } from "@volta-sim/contracts";
 import { resolveAuthoredRequest } from "@volta-sim/core";
 import { describe, expect, it } from "vitest";
+import YAML from "yaml";
 import { sha256Digest } from "../../core/src/canonical.js";
 import { createCaseVersionDigests } from "../../core/src/case-version.js";
 import { publishCase } from "../../core/src/published-case.js";
@@ -74,6 +75,37 @@ async function materializeStudentOutput(
 }
 
 describe("deterministic file-based case authoring", () => {
+  it("keeps complete personas and overlapping buyer roles private and digest-bound", async () => {
+    const caseRoot = await copyFixture();
+    const before = await importCaseDirectory(caseRoot);
+    const profile = before.source.protected.personaBehaviors[0]!.profile!;
+    expect(profile.buyerRoles.map(buyer => buyer.role)).toEqual(["economic_buyer", "functional_buyer", "technical_buyer"]);
+    expect(profile.jobs[0]!.forces.anxiety).toContain("Spending");
+    expect(JSON.stringify(before.source.visible)).not.toContain("economic_buyer");
+    const personaPath = path.join(caseRoot, "staff/personas.yaml");
+    const original = await readFile(personaPath, "utf8");
+    await writeFile(personaPath, original.replace("Plain spoken and brief", "PRIVATE-PERSONA-CANARY and brief"));
+    const after = await importCaseDirectory(caseRoot);
+    expect(after.digests.protectedPackageDigest).not.toBe(before.digests.protectedPackageDigest);
+    expect(after.digests.visibleBundleDigest).toBe(before.digests.visibleBundleDigest);
+    expect(await materializeStudentOutput(caseRoot, after.studentBundleManifest)).not.toContain("PRIVATE-PERSONA-CANARY");
+  });
+
+  it.each(["missing-profile", "missing-job", "buyer-coverage", "unknown-job", "unknown-relationship", "unavailable-knowledge", "unknown-route"])("rejects incomplete persona authoring: %s", async defect => {
+    const caseRoot = await copyFixture();
+    const personaPath = path.join(caseRoot, "staff/personas.yaml");
+    const document = YAML.parse(await readFile(personaPath, "utf8"));
+    const person = document.personas[0];
+    if (defect === "missing-profile") delete person.profile;
+    if (defect === "missing-job") person.profile.jobs = [];
+    if (defect === "buyer-coverage") { person.profile.buyerRoles = []; person.roles = ["champion"]; }
+    if (defect === "unknown-job") person.profile.buyerRoles[0].jobIds = ["missing-job"];
+    if (defect === "unknown-relationship") person.profile.relationships = [{ personaId: "missing-person", perspective: "Unknown" }];
+    if (defect === "unavailable-knowledge") person.profile.knowledge[0].factId = "missing-fact";
+    if (defect === "unknown-route") person.profile.discoveryRoutes.job = ["missing-route"];
+    await writeFile(personaPath, YAML.stringify(document));
+    await expect(importCaseDirectory(caseRoot)).rejects.toThrow();
+  });
   it("normalizes a synthetic blank-origin variant through the same contract", async () => {
     const caseRoot = await copyFixture();
     const sourcePinsPath = path.join(caseRoot, "staff/source-pins.yaml");

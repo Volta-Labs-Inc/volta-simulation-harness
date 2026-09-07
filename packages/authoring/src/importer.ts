@@ -604,9 +604,44 @@ async function normalizeCase(loaded: LoadedAssembly): Promise<CaseVersionSource>
     throw new Error("The protected truth must bind the authored case id");
   }
   const personaIds = new Set(personas.personas.map(({ id }) => id));
+  for (const persona of personas.personas) {
+    const profile = persona.profile;
+    const fail = (message: string): never => { throw new Error(`Persona ${persona.id}: ${message}`); };
+    const jobs = new Set(profile.jobs.map(job => job.id));
+    if (jobs.size !== profile.jobs.length) fail("duplicate job identifier");
+    const buyers = profile.buyerRoles.map(buyer => buyer.role);
+    if (new Set(buyers).size !== buyers.length) fail("duplicate buyer role");
+    for (const role of ["economic_buyer", "functional_buyer", "technical_buyer"] as const) {
+      if (persona.roles.includes(role) !== buyers.includes(role)) fail(`roles and buyer profile disagree about ${role}`);
+    }
+    for (const buyer of profile.buyerRoles) {
+      for (const jobId of buyer.jobIds) if (!jobs.has(jobId)) fail(`unknown buyer job ${jobId}`);
+    }
+    for (const relationship of profile.relationships) {
+      if (!personaIds.has(relationship.personaId) || relationship.personaId === persona.id) fail("invalid relationship persona");
+    }
+    const released = new Set([...persona.opening.releases, ...persona.routes.flatMap(route => route.releases)]);
+    const known = new Set(profile.knowledge.map(item => item.factId));
+    if (known.size !== profile.knowledge.length) fail("duplicate knowledge fact");
+    for (const factId of known) {
+      if (!(factId in evidence.fact_index) || !released.has(factId)) fail(`knowledge fact ${factId} is unknown or undiscoverable`);
+    }
+    for (const factId of released) if (!known.has(factId)) fail(`released fact ${factId} has no knowledge basis`);
+    if (new Set(profile.episodes.map(episode => episode.id)).size !== profile.episodes.length) fail("duplicate episode identifier");
+    for (const episode of profile.episodes) {
+      for (const factId of episode.factIds) if (!known.has(factId)) fail(`episode references unknown knowledge ${factId}`);
+    }
+    for (const routeIds of Object.values(profile.discoveryRoutes)) {
+      for (const routeId of routeIds) if (!persona.routes.some(route => route.id === routeId)) fail(`unknown discovery route ${routeId}`);
+    }
+  }
   for (const [role, personaId] of Object.entries(truth.stakeholder_truth)) {
     if (!personaIds.has(personaId)) {
       throw new Error(`Protected truth references unknown ${role} persona: ${personaId}`);
+    }
+    if (["economic_buyer", "functional_buyer", "technical_buyer"].includes(role) &&
+      !personas.personas.find(persona => persona.id === personaId)!.profile.buyerRoles.some(buyer => buyer.role === role)) {
+      throw new Error(`Protected truth ${role} is not supported by ${personaId}'s buyer profile`);
     }
   }
 
@@ -884,7 +919,7 @@ async function normalizeCase(loaded: LoadedAssembly): Promise<CaseVersionSource>
       personas: personas.personas.map((persona) => ({
         id: persona.id,
         name: persona.display_name,
-        role: `${persona.title}; ${persona.roles.map(authoredCue).join(", ")}`,
+        role: persona.title,
         studentBrief: persona.opening.points.join(" "),
       })),
       evidenceSources: evidence.entries.map((entry) => ({
@@ -908,6 +943,7 @@ async function normalizeCase(loaded: LoadedAssembly): Promise<CaseVersionSource>
       routes: [...personaRoutes, ...directEvidenceRoutes, ...collectionRoutes],
       personaBehaviors: personas.personas.map((persona) => ({
         personaId: persona.id,
+        profile: persona.profile,
         incentives: persona.incentives,
         uncertainties: [],
         biases: persona.biases,

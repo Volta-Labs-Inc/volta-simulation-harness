@@ -366,8 +366,12 @@ function activeViewFor(state: MockStudentServiceState): StudentAssignmentView {
     ];
   });
   const availableCollectionMethods = state.useAuthoredRoutes
-    ? visible.evidenceSources.filter(({ kind }) => kind === "collection-opportunity")
-      .map(({ id, studentBrief }) => ({ id, description: studentBrief }))
+    ? [
+      ...visible.evidenceSources.filter(({ kind }) => kind === "collection-opportunity")
+        .map(({ id, studentBrief }) => ({ id, description: studentBrief })),
+      ...state.submissionContext.publishedCase.source.protected.routes.filter(({ channel, id }) => channel === "collection" && !visible.evidenceSources.some(source => source.kind === "collection-opportunity" && source.id === id))
+        .map(({ id, match }) => ({ id, description: `Authored plan cues: ${[...match.allTerms, ...match.anyTermGroups.map(group => group.join(" "))].join("; ")}` })),
+    ]
     : [
     ...new Set(
       state.scriptedActions
@@ -532,6 +536,7 @@ function proofIssue(
 }
 
 export interface FileBackedMockStudentServiceOptions {
+  readonly interviewExportRoot?: string;
   readonly now?: () => Date;
   readonly interruptAfterCommit?: ReadonlySet<string>;
   readonly verifySubmissionRepository?: (
@@ -610,7 +615,23 @@ export class FileBackedMockStudentService implements StudentServiceClient {
   }
 
   async execute(request: StudentServiceRequest, token?: string): Promise<StudentServiceResponse> {
-    return withMockStudentStateLock(this.serviceStateRoot, this.statePath, () => this.#executeLocked(request, token));
+    return withMockStudentStateLock(this.serviceStateRoot, this.statePath, async () => {
+      const response = await this.#executeLocked(request, token);
+      if (request.kind === "talk" && this.options.interviewExportRoot !== undefined) {
+        const state = await this.#load();
+        await writeControlJson(this.options.interviewExportRoot,
+          `.volta-sim/interviews/attempt-${state.attempt.attemptNumber}/${encodeURIComponent(request.personaId)}.json`, {
+            assignmentId: state.assignmentId,
+            attemptNumber: state.attempt.attemptNumber,
+            personaId: request.personaId,
+            turns: state.events.filter(event => event.interview?.personaId === request.personaId)
+              .map(event => ({ eventId: event.eventId, question: event.interview!.question,
+                answer: event.message, simulatedAt: event.simulatedAt,
+                officialFactIds: event.officialFactIds, provenance: event.provenance })),
+          });
+      }
+      return response;
+    });
   }
 
   async #executeLocked(request: StudentServiceRequest, token?: string): Promise<StudentServiceResponse> {
@@ -714,13 +735,16 @@ export class FileBackedMockStudentService implements StudentServiceClient {
         const visible = state.submissionContext.publishedCase.source.visible;
         const known = request.kind === "talk" ? visible.personas.some(({ id }) => id === targetId)
           : request.kind === "evidence" ? visible.evidenceSources.some(({ id }) => id === targetId)
-          : visible.evidenceSources.some(({ id, kind }) => id === targetId && kind === "collection-opportunity");
+          : state.submissionContext.publishedCase.source.protected.routes.some(({ id, channel }) => id === targetId && channel === "collection");
         if (!known) throw new MockServiceError("That action is unavailable", "ACTION_UNAVAILABLE");
         const resolution = resolveAuthoredRequest(state.submissionContext.publishedCase, {
           assignmentId: state.assignmentId, attemptNumber: state.attempt.attemptNumber,
           channel: request.kind === "talk" ? "persona" : request.kind === "evidence" ? "evidence" : "collection",
-          targetId, question: request.kind === "collect" ? request.plan : request.question,
+          targetId: request.kind === "collect" ? "collection" : targetId, question: request.kind === "collect" ? request.plan : request.question,
         }, releasedContext(state).trustedReleasedState);
+        if (request.kind === "collect" && resolution.status === "matched" && resolution.routeId !== request.methodId) {
+          throw new MockServiceError("The plan does not match the selected collection method", "ACTION_UNAVAILABLE");
+        }
         let simulatedTime: { advancedBy: { amount: number; unit: "minutes" | "hours" | "days" }; now: string } | undefined;
         if (resolution.status === "matched") {
           const time = resolution.consequence.time;
@@ -732,9 +756,12 @@ export class FileBackedMockStudentService implements StudentServiceClient {
         const event = {
           ...nextEvent(state, request.kind, resolution.studentMessage, resolution.officialFacts.map(({ id }) => id)),
           releasedEvidenceIds: resolution.releasedEvidenceIds,
+          ...(request.kind === "talk" ? { interview: { personaId: request.personaId, question: request.question } } : {}),
         };
         state.events.push(event);
         const releasedSomething = resolution.officialFacts.length > 0;
+        const authoredReview = resolution.status === "matched" && state.submissionContext.publishedCase.source.protected.routes
+          .find(({ id }) => id === resolution.routeId)?.consequence.risk?.suggestStaffReview === true;
         const newFactIds = resolution.officialFacts.map(({ id }) => id).filter((id) => !alreadyReleased.has(id));
         const guidance = !releasedSomething
           ? "No official fact was released, so nothing in this reply can be cited by ID. If it matters to your decision, record it with ledger --kind unknown."
@@ -746,7 +773,9 @@ export class FileBackedMockStudentService implements StudentServiceClient {
           checkpointPrompts: releasedSomething ? CHECKPOINT_PROMPTS : NO_PROMPTS,
           ...(resolution.status === "ambiguous"
             ? reviewSuggestion("Your question matched more than one authored answer, so nothing was released. Rephrase it, or ask staff which reading you meant.")
-            : { reviewSuggested: false }),
+            : authoredReview
+              ? reviewSuggestion("This authored collection suggests staff review; sandbox work can continue.")
+              : { reviewSuggested: false }),
           ...(simulatedTime === undefined ? {} : { simulatedTime }),
           guidance,
           sandboxWorkBlocked: false, replayed: false,
@@ -770,7 +799,9 @@ export class FileBackedMockStudentService implements StudentServiceClient {
         scripted.officialFactIds,
         providerInteractionId,
       );
-      state.events.push(event);
+      state.events.push(request.kind === "talk"
+        ? { ...event, interview: { personaId: request.personaId, question: request.question } }
+        : event);
       if (scripted.provider !== undefined && providerInteractionId !== undefined) {
         state.providerProvenance.push({
           ...scripted.provider,

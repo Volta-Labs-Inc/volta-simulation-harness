@@ -20,6 +20,7 @@ import {
 import { createLocalPilotManifest } from "../packages/student-cli/dist/local-cli.js";
 import { startLocalStudentHttpService } from "../packages/student-cli/dist/local-http-service.js";
 import { writeControlJson } from "../packages/student-cli/dist/control-files.js";
+import { loadLocalPracticeCase } from "./local-practice-case.mjs";
 
 const repositoryRoot = path.resolve(fileURLToPath(new URL("..", import.meta.url)));
 const statePath = "mock-service.json";
@@ -27,14 +28,20 @@ const publicExampleProtectedCanary = "LOCAL-PILOT-PUBLIC-EXAMPLE-PROTECTED-CANAR
 
 function parseArguments(argv) {
   let requestedRoot;
+  let practiceCase;
   for (let index = 0; index < argv.length; index += 2) {
-    if (argv[index] !== "--root" || argv[index + 1] === undefined) {
-      throw new Error("Use npm run pilot:local or add only --root <empty-directory>");
+    if (!["--root", "--practice-case"].includes(argv[index]) || argv[index + 1] === undefined) {
+      throw new Error("Use npm run pilot:local [-- --root <empty-directory> --practice-case <case-directory>]");
+    }
+    if (argv[index] === "--practice-case") {
+      if (practiceCase !== undefined) throw new Error("Provide --practice-case only once");
+      practiceCase = path.resolve(argv[index + 1]);
+      continue;
     }
     if (requestedRoot !== undefined) throw new Error("Provide --root only once");
     requestedRoot = path.resolve(argv[index + 1]);
   }
-  return { requestedRoot };
+  return { requestedRoot, practiceCase };
 }
 
 function git(root, args) {
@@ -76,7 +83,7 @@ async function preparePilotRoot(requestedRoot) {
   return fs.promises.realpath(requestedRoot);
 }
 
-async function createAssignment(pilotRoot) {
+async function createAssignment(pilotRoot, practice) {
   const assignmentId = `local-public-${randomBytes(6).toString("hex")}`;
   const assignmentRoot = path.join(pilotRoot, "assignment");
   const serviceRoot = path.join(pilotRoot, "service");
@@ -86,13 +93,13 @@ async function createAssignment(pilotRoot) {
   });
   await fs.promises.mkdir(serviceRoot, { mode: 0o700 });
 
-  const visible = nonAssessedLibraryRoutingCase.visible;
+  const visible = practice?.source.visible ?? nonAssessedLibraryRoutingCase.visible;
   const localBin = path.join(repositoryRoot, "packages", "student-cli", "dist", "local-bin.js");
   const studentCommand = `node ${shellQuote(localBin)} --manifest .volta-sim/local-pilot.json`;
   const guide = studentGuideMarkdown({
     commandName: studentCommand,
     launcherNote:
-      "This is a local, public, non-assessed pilot. Keep the terminal that printed this folder's path open: it runs the service behind every command. If a command fails to connect, that terminal has been closed and a new pilot must be started. The commands below are written out in full so they can be copied as-is.",
+      "This is a local, non-assessed practice run with frozen authored answers and no live AI rendering. Keep the terminal that printed this folder's path open: it runs the service behind every command. If a command fails to connect, that terminal has been closed and a new pilot must be started. The commands below are written out in full so they can be copied as-is.",
   });
   const agentInstructions = agentInstructionsMarkdown({ commandName: studentCommand });
   const people = visible.personas.map(
@@ -123,6 +130,15 @@ async function createAssignment(pilotRoot) {
     fs.promises.writeFile(path.join(assignmentRoot, ".gitignore"), ".volta-sim/\n", "utf8"),
   ]);
 
+  const extraTargets = [];
+  for (const file of practice?.studentFiles ?? []) {
+    if (file.targetPath === "README.md") continue; // The generated README already contains the authored brief.
+    const target = path.join(assignmentRoot, file.targetPath);
+    await fs.promises.mkdir(path.dirname(target), { recursive: true, mode: 0o700 });
+    await fs.promises.writeFile(target, file.targetPath === "method.md" ? `${file.text}\n${method}` : file.text, { mode: 0o600 });
+    extraTargets.push(file.targetPath);
+  }
+
   // Claude Code reads CLAUDE.md; a relative symlink keeps it identical to AGENTS.md
   // for every other agent without a second copy that could drift.
   await fs.promises.symlink(AGENT_INSTRUCTIONS_FILE, path.join(assignmentRoot, CLAUDE_POINTER_FILE));
@@ -140,6 +156,7 @@ async function createAssignment(pilotRoot) {
     "method.md",
     "requirements.json",
     "results/response.md",
+    ...extraTargets,
   ]);
   git(assignmentRoot, [
     "-c",
@@ -148,13 +165,13 @@ async function createAssignment(pilotRoot) {
     "user.email=local-pilot@example.invalid",
     "commit",
     "-m",
-    "Start public non-assessed simulation",
+    "Start local non-assessed simulation",
   ]);
   const commitSha = git(assignmentRoot, ["rev-parse", "HEAD"]);
   const sessionIgnoreBlobId = git(assignmentRoot, ["rev-parse", "HEAD:.gitignore"]);
   const responseBlobId = git(assignmentRoot, ["rev-parse", "HEAD:results/response.md"]);
 
-  const source = JSON.parse(JSON.stringify(nonAssessedLibraryRoutingCase));
+  const source = JSON.parse(JSON.stringify(practice?.source ?? nonAssessedLibraryRoutingCase));
   // This synthetic protected marker belongs only to the sibling service state. The
   // process proof fails if any future launcher copies protected material to students.
   source.protected.authoredRisks.push(publicExampleProtectedCanary);
@@ -170,6 +187,7 @@ async function createAssignment(pilotRoot) {
     validationDigest: sha256Digest(receiptContent),
   });
   const now = new Date().toISOString();
+  if (practice) await writeControlJson(serviceRoot, "practice-provenance.json", practice.provenance);
   await writeControlJson(serviceRoot, statePath, {
     version: 1,
     assignmentId,
@@ -201,7 +219,7 @@ async function createAssignment(pilotRoot) {
     },
     workingDraft: {},
     stage: "discovery",
-    simulatedAt: now,
+    simulatedAt: practice?.simulatedAt ?? now,
     scriptedActions: [],
     useAuthoredRoutes: true,
     events: [],
@@ -257,9 +275,10 @@ function stopChild(child) {
 }
 
 async function run() {
-  const { requestedRoot } = parseArguments(process.argv.slice(2));
+  const { requestedRoot, practiceCase } = parseArguments(process.argv.slice(2));
+  const practice = practiceCase === undefined ? undefined : await loadLocalPracticeCase(practiceCase);
   const pilotRoot = await preparePilotRoot(requestedRoot);
-  const assignment = await createAssignment(pilotRoot);
+  const assignment = await createAssignment(pilotRoot, practice);
   let studentService;
   let staffProcess;
   try {

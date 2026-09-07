@@ -1,5 +1,7 @@
 # Case authoring importer
 
+Start problem generation with [the persona and buyer authoring requirements](PERSONA-GENERATION.md). Every imported person requires a complete private persona, JTBD, knowledge boundaries, episodes and discoverable routes. Every case must cover Economic, Functional and Technical buyers, including explicit overlap. These are validated requirements, not optional prompting advice.
+
 The importer turns an explicitly allowlisted multi-file case directory into separate student-visible and protected packages. It reads local UTF-8 YAML, Markdown, and CSV files only; it never fetches a URL or contacts an authoring reference system.
 
 Run `npm run case:validate -- <case-directory>` to validate a case and preview deterministic digests. These previews detect changed material; they do not approve, publish, or confer trust on a case. A valid draft remains ineligible for publication until a later trusted service records the approval and binds it to the exact visible and protected material.

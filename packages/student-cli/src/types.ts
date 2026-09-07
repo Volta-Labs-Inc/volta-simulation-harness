@@ -375,6 +375,7 @@ export interface ScriptedOfficialAction {
 }
 
 export interface MockOfficialEvent extends OfficialActionEvent {
+  readonly interview?: { readonly personaId: string; readonly question: string };
   readonly providerInteractionId?: string;
   readonly releasedEvidenceIds?: readonly string[];
 }
