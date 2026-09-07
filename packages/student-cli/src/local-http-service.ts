@@ -68,6 +68,7 @@ export async function startLocalStudentHttpService(
     ...(options.now === undefined ? {} : { now: options.now }),
     ...(options.assignmentRoot === undefined ? {} : {
       verifySubmissionRepository: createLocalSubmissionRepositoryVerifier(options.assignmentRoot),
+      interviewExportRoot: options.assignmentRoot,
     }),
   });
   const server = createServer((request, response) => {

@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { PersonaProfileSchema } from "./persona.js";
 
 const IdentifierSchema = z
   .string()
@@ -386,6 +387,7 @@ export const ProtectedCasePackageSchema = z
         z
           .object({
             personaId: IdentifierSchema,
+            profile: PersonaProfileSchema.optional(),
             incentives: z.array(z.string().min(1).max(1_000)).min(1).max(20),
             uncertainties: z.array(z.string().min(1).max(1_000)).max(20),
             biases: z.array(z.string().min(1).max(1_000)).max(20).optional(),

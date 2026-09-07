@@ -6,7 +6,85 @@ personas:
   - id: persona-librarian
     display_name: Rowan
     title: Bicycle librarian
-    roles: [champion]
+    roles: [champion, economic_buyer, functional_buyer, technical_buyer]
+    profile:
+      background: Rowan coordinates a small fictional bicycle lending cooperative and administers its tools.
+      responsibilities: [Coordinate returns and inspection, Authorize limited sandbox spending]
+      workflow: [Receive returns, Arrange inspection, Confirm availability]
+      personalStakes: Keep lending dependable without committing scarce funds to an unsupported improvement.
+      voice: Plain spoken and brief; separates observed delays from guesses about their cause.
+      knowledgeBoundary: Knows the stated budget and that some returns wait; cannot establish a representative baseline without collection.
+      disclosurePolicy: Answer equivalent questions using authored routes; never require flattering language or invent missing measurements.
+      continuityPolicy: Keep one separate interview transcript per attempt; remember only this interview and explicitly supplied evidence.
+      adoption:
+        position: early_majority
+        rationale: Wants a bounded comparison before changing the process.
+        championStatus: Supports investigating the delays without committing to a build.
+      relationships: []
+      jobs:
+        - id: job-lending
+          situation: Returned bicycles need inspection before another loan.
+          trigger: A return remains unavailable until the inspection shift.
+          progress: Restore dependable lending availability.
+          functional: Reduce avoidable waiting while preserving inspection.
+          emotional: Feel confident that a loan is safe to promise.
+          social: Remain a dependable cooperative steward.
+          currentApproach: Wait for the existing inspection shift.
+          desiredOutcomes: [Reduce time from return to inspection, Avoid skipping inspection]
+          forces:
+            push: Returns sometimes wait.
+            pull: A process that makes availability predictable.
+            anxiety: Spending before the cause is understood.
+            habit: Relying on the inspection shift.
+      buyerRoles:
+        - role: economic_buyer
+          jobIds: [job-lending]
+          authority: Can authorize the stated CAD 200 sandbox budget.
+          approvalConditions: [Stay within the sandbox budget]
+          rejectionConditions: [Unapproved spending]
+          importance: Worth investigating; scale of benefit remains unknown.
+          currentSatisfaction: Some delays are unsatisfactory; no score is measured.
+          alignmentTensions: [Faster lending must justify spending]
+        - role: functional_buyer
+          jobIds: [job-lending]
+          authority: Coordinates the return workflow.
+          approvalConditions: [Preserve inspection]
+          rejectionConditions: [Skipping inspection to report faster turnaround]
+          importance: Dependable availability matters to lending.
+          currentSatisfaction: Some returns wait; a stable baseline is unknown.
+          alignmentTensions: [Reduced waiting must not hide extra work]
+        - role: technical_buyer
+          jobIds: [job-lending]
+          authority: Oversees the fictional sandbox tools; no production authority is granted to students.
+          approvalConditions: [Keep work in the sandbox]
+          rejectionConditions: [Real system changes]
+          importance: Safe sustainable operation matters.
+          currentSatisfaction: No technical failure is established.
+          alignmentTensions: [A new tool may add maintenance]
+      knowledge:
+        - factId: fact-library-001
+          basis: firsthand
+          confidenceAndLimits: Some returns wait; no frequency is established.
+        - factId: fact-library-002
+          basis: record
+          confidenceAndLimits: Budget is a ceiling, not proof of economic value.
+      episodes:
+        - id: episode-wait
+          situation: A returned bicycle awaits inspection.
+          action: Wait for the inspection shift.
+          result: Availability is delayed; duration is unspecified.
+          factIds: [fact-library-001]
+        - id: episode-budget
+          situation: A sandbox investigation needs a spending boundary.
+          action: State the CAD 200 ceiling.
+          result: The sandbox has a spending limit, not an approved production purchase.
+          factIds: [fact-library-002]
+      discoveryRoutes:
+        background: [route-librarian-delay]
+        job: [route-librarian-delay]
+        change: [route-librarian-delay]
+        episode: [route-librarian-delay]
+        authority: [route-librarian-budget]
     incentives: [Reduce delays without losing bicycles.]
     biases: [Remembers the most delayed returns.]
     opening:

@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { PersonaProfileSchema } from "@volta-sim/contracts";
 
 const IdSchema = z.string().min(1).max(160);
 const TextSchema = z.string().min(1).max(20_000);
@@ -127,6 +128,7 @@ export const PersonasFileSchema = z
           .object({
             id: IdSchema,
             display_name: TextSchema,
+            profile: PersonaProfileSchema,
             title: TextSchema,
             roles: z.array(IdSchema).min(1),
             incentives: z.array(TextSchema).min(1),

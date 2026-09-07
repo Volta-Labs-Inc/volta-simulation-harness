@@ -1,5 +1,11 @@
 # Volta Simulation Harness
 
+New cases default to small businesses unless the user explicitly requests another setting. Characters and student guidance use conversational, plain English. Buyer-role and JTBD labels belong in teaching notes with simple explanations, rather than in the characters' speech.
+
+Case generation follows the [persona, JTBD and buyer requirements](packages/authoring/PERSONA-GENERATION.md). The authoring importer rejects missing character profiles, incomplete buyer coverage and broken discovery references. Full profiles stay private; students discover roles and motivations through evidence.
+
+Local persona interviews save the exact submitted question, official answer, and evidence references in `.volta-sim/interviews/attempt-N/persona-ID.json` inside the assignment. Use a separate chat for each persona. Repeating an operation does not duplicate its transcript entry. These exports contain simulation interviews only; they do not capture coding-agent conversations.
+
 An evidence-led environment for realistic student problems. Each simulation asks one student to decide whether a problem warrants a build, a smaller experiment, a purchase, more evidence, a pivot, or a stop—and to defend that decision with objective success and failure criteria.
 
 ## Current status
@@ -38,6 +44,8 @@ npm run pilot:local
 This one command builds the workspace, creates a new isolated Git assignment under `.private/local-pilots/`, starts the file-backed student service and connected staff workbench on loopback ports, and prints the exact student help, login, status, and staff-browser commands. Attempt 1 starts active with no events, review requests, released evidence, captured reasoning, or submission. Press Ctrl-C once to stop both services cleanly; the isolated checkout and local records remain available for inspection.
 
 The printed student commands use the separate `volta-sim-local` entry point and its generated `.volta-sim/local-pilot.json`. That command accepts no service-origin flag and rejects non-loopback, moved, or altered manifests. The production `volta-sim` command retains its fixed release origin.
+
+To rehearse an authored case locally, run `npm run pilot:local -- --practice-case <private-case-directory>`. This explicit command creates a separate non-assessed practice snapshot; it does not approve or alter the original case for assessment. Only allowlisted starting files enter the assignment. Later evidence appears as inert text in the relevant official reply, and collections retain their authored prerequisites. Replies use frozen authored wording, with no live model calls. Staff truth and the source digest receipt remain in the sibling local service directory. This same-machine practice setup is for the case owner, not a hosted blind-access boundary.
 
 ## License
 

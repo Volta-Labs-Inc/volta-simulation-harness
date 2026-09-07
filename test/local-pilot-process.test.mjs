@@ -17,6 +17,62 @@ const protectedMarkers = [
   "The synthetic desk log shows a median first response time of 18 minutes.",
 ];
 
+test("an authored draft can be rehearsed locally with gated evidence and collection methods", async () => {
+  const pilotRoot = fs.mkdtempSync(path.join(os.tmpdir(), "volta-authored-practice-"));
+  roots.push(pilotRoot);
+  const caseRoot = path.resolve("packages/authoring/test/fixtures/non-assessed-bicycle-library");
+  const originalCase = fs.readFileSync(path.join(caseRoot, "case.yaml"), "utf8");
+  const child = spawn(process.execPath, [path.resolve("scripts/local-pilot.mjs"), "--root", pilotRoot, "--practice-case", caseRoot], {
+    cwd: path.resolve("."), env: { PATH: process.env.PATH }, stdio: ["ignore", "pipe", "pipe"],
+  });
+  processes.push(child);
+  const output = { value: "" };
+  child.stdout.on("data", chunk => { output.value += String(chunk); });
+  child.stderr.on("data", chunk => { output.value += String(chunk); });
+  await waitForOutput(child, output, /Press Ctrl-C to stop both local services/u);
+  const assignment = path.join(fs.realpathSync(pilotRoot), "assignment");
+  const manifest = path.join(assignment, ".volta-sim/local-pilot.json");
+  const run = async args => JSON.parse((await runLocalStudent(assignment, manifest, args)).stdout);
+  const origin = /Student service: (http:\/\/127\.0\.0\.1:\d+)/u.exec(output.value)[1];
+  expect((await fetch(`${origin}/v1/student/assignment/status`)).status).not.toBe(200);
+  expect((await fetch(`${origin}/staff/truth.yaml`)).status).toBe(404);
+  const working = workingFileText(assignment);
+  expect(working).toContain("no live AI rendering");
+  expect(fs.existsSync(path.join(assignment,"evidence/weekly-counts.csv"))).toBe(true);
+  expect(working).not.toContain("The representative sample contains 40 returns.");
+  expect(await reachableGitText(assignment)).not.toContain("The representative sample contains 40 returns.");
+  await runLocalStudent(assignment, manifest, ["login", "--operation-id", "practice-login"]);
+  const status = await run(["status"]);
+  expect(status.view.availableCollectionMethods.map(m => m.id)).toContain("collection-representative");
+  const talk = await run(["talk", "--operation-id", "practice-talk", "--persona", "persona-librarian", "--question", "Why the delay?"]);
+  expect(talk.message).toContain("Some returns wait");
+  const transcriptPath = path.join(assignment, ".volta-sim/interviews/attempt-1/persona-librarian.json");
+  const transcript = JSON.parse(fs.readFileSync(transcriptPath, "utf8"));
+  expect(transcript.turns).toHaveLength(1);
+  expect(transcript.turns[0]).toMatchObject({ question: "Why the delay?", answer: talk.message, eventId: talk.event.eventId });
+  await run(["talk", "--operation-id", "practice-talk", "--persona", "persona-librarian", "--question", "Why the delay?"]);
+  expect(JSON.parse(fs.readFileSync(transcriptPath, "utf8"))).toEqual(transcript);
+  const blocked = await run(["evidence", "--operation-id", "practice-blocked", "--source", "evidence-sample-a", "--question", "show"]);
+  expect(blocked.event.officialFactIds).toEqual([]);
+  const beforeMismatch = JSON.parse(fs.readFileSync(path.join(pilotRoot,"service/mock-service.json"),"utf8"));
+  await expect(run(["collect", "--operation-id", "practice-mismatch", "--method", "collection-quick", "--plan", "representative sample"])).rejects.toThrow();
+  const afterMismatch = JSON.parse(fs.readFileSync(path.join(pilotRoot,"service/mock-service.json"),"utf8"));
+  expect(afterMismatch.events).toEqual(beforeMismatch.events);
+  expect(afterMismatch.simulatedAt).toBe(beforeMismatch.simulatedAt);
+  const collection = await run(["collect", "--operation-id", "practice-collect", "--method", "collection-representative", "--plan", "representative sample"]);
+  expect(collection.message).toContain(fs.readFileSync(path.join(caseRoot,"evidence/sample-a.csv"),"utf8"));
+  const afterCollection = JSON.parse(fs.readFileSync(path.join(pilotRoot,"service/mock-service.json"),"utf8"));
+  expect(afterCollection.events.at(-1).releasedEvidenceIds).toEqual(["evidence-sample-a","evidence-sample-b"]);
+  expect(collection.reviewSuggested).toBe(true);
+  const replay = await run(["collect", "--operation-id", "practice-collect", "--method", "collection-representative", "--plan", "representative sample"]);
+  expect(replay.replayed).toBe(true);
+  expect(replay.event.eventId).toBe(collection.event.eventId);
+  expect(fs.readFileSync(path.join(caseRoot,"case.yaml"),"utf8")).toBe(originalCase);
+  const state = JSON.parse(fs.readFileSync(path.join(pilotRoot,"service/mock-service.json"),"utf8"));
+  expect(state.submissionContext.publishedCase.source.visible.assessmentUse).toBe("non-assessed-example");
+  expect(state.providerProvenance).toEqual([]);
+}, 45_000);
+
 function waitForOutput(child, output, pattern, timeoutMs = 30_000) {
   return new Promise((resolve, reject) => {
     const timer = setTimeout(() => {
